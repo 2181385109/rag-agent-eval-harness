@@ -8,12 +8,12 @@
 
 ---
 
-## 当前进度：M1 / M6（骨架）
+## 当前进度：M2 / M6（被测系统就绪）
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
 | M1 | 目录骨架、依赖锁版本、config、`.env` 载入、DeepSeek 客户端封装、hello-world LangGraph 图 | ✅ 完成 |
-| M2 | RAG（切分 → FAISS → 检索）+ 两个工具 + ReAct 图 + 轨迹记录 | ⬜ |
+| M2 | RAG（切分 → FAISS → 检索）+ 两个工具 + ReAct 图 + 轨迹记录 | ✅ 完成 |
 | M3 | 30–50 条自建黄金集；recall@k / 任务成功率 / 工具调用准确率 / 多轮一致性 | ⬜ |
 | M4 | RAGAS：faithfulness / answer_relevancy / context recall | ⬜ |
 | M5 | LLM-as-Judge + 人工标注对照，Cohen's kappa | ⬜ |
@@ -50,7 +50,9 @@ pytest -m live
 问一句话，走完整的 LangGraph 状态图：
 
 ```bash
-python -m src.agent.graph "用一句话解释什么是过拟合。"
+python -m src.agent.rag --build                       # 建 FAISS 索引（首次会下载 BGE 模型）
+python -m src.agent.rag --list                        # 列出 doc_id -> 出处，标注黄金集时用
+python -m src.agent.graph --trace "PSI 告警阈值定在多少？"   # 跑 Agent 并打印完整轨迹
 ```
 
 ---

@@ -49,8 +49,30 @@ HUMAN_LABELS_PATH = DATA_DIR / "human_labels.jsonl"
 # ------------------------------------------------------------- 检索（M2 生效）
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 80
-EMBEDDING_MODEL = "BAAI/bge-large-zh-v1.5"
+
+# 允许用环境变量临时换小模型跑通逻辑（bge-small-zh-v1.5 约 95MB，large 约 1.3GB）。
+# 出正式指标时必须用默认的 large，报告里也会记下实际用的是哪个。
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-large-zh-v1.5")
+
+# BGE 官方建议：查询侧加指令前缀，文档侧不加。
+# 但 M2 用本仓库语料做的 3 条探针显示前缀反而拉低了命中排名，
+# 样本太少不足以据此定口径——留成开关，等 M3 用 recall@k 正式裁决。
+USE_QUERY_INSTRUCTION = True
+QUERY_INSTRUCTION = "为这个句子生成表示以用于检索相关文章："
+
 RETRIEVE_TOP_K = 4
+
+# corpus/README.md 是写给人看的放置说明，不是语料，不进索引。
+CORPUS_EXCLUDE = ("README.md",)
+CORPUS_SUFFIXES = (".md", ".txt")
+INDEX_DIR = PROJECT_ROOT / "index"  # FAISS 索引落盘位置（已 gitignore，可由代码重建）
+
+# 中文优先的切分分隔符：先按段落/换行，再按中文句读，最后才退到字符级
+SPLIT_SEPARATORS = ("\n\n", "\n", "。", "！", "？", "；", "，", " ", "")
+
+# ------------------------------------------------------------ Agent（M2 生效）
+# ReAct 循环的硬上限：模型打转时必须能停下来，否则一道题能烧掉一把 token。
+MAX_AGENT_STEPS = 6
 
 # ------------------------------------------------------------ 评测（M3+ 生效）
 CONSISTENCY_RUNS = 5  # 多轮一致性：同题跑几次
