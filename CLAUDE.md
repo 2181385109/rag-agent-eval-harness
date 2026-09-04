@@ -121,12 +121,29 @@ rag-agent-eval-harness/
   "id": "cap_001",
   "question": "...",
   "reference_answer": "...",
-  "expected_tool": "retrieve | calc | ...",
-  "expected_doc_ids": ["doc_12", "doc_34"],
+  "answer_keys": ["0.25", "显著漂移"],
+  "expected_tool": ["retrieve", "calc"],
+  "expected_doc_ids": ["c730fa5c_0027"],
   "answer_type": "closed | open",
   "failure_tag": null
 }
 ```
+
+> **schema 修订记录（2026-09-05，M3）**
+>
+> 1. `expected_tool` 由**单个字符串**改为**有序列表**。原因：像"PSI 显著阈值减去
+>    轻微下限差多少"这类题天然需要先 `retrieve` 再 `calc`，单字符串表达不了顺序，
+>    也就没法判定"工具选对没"。判定口径：把实际工具序列的**连续重复折叠**后
+>    与本列表**逐项严格比对**（模型连调两次 retrieve 视同一次；多调一个工具算错）。
+> 2. 新增 `answer_keys`：闭合题规则判定所需的**必现关键片段**。§8.3 要求"闭合题
+>    规则判定，能不用 LLM 判就不用"，但不标出"什么算答对"就无从规则判定。
+>    判定口径：`answer_keys` 全部出现在最终答案里才算成功（比对前统一全角转半角、
+>    去空格、转小写）。单个 key 内用 `|` 分隔可接受的写法变体，命中其一即可，
+>    例如 `"0.8|80%"`、`"分层|stratify"`——这是为了让规则判定不被措辞差异误伤，
+>    而不是放宽正确性标准。开放题 `answer_keys` 留空，交 M5 的裁判层。
+> 3. `expected_doc_ids` 允许为空（纯算术题、幻觉诱饵题）。**recall@k 只在非空的
+>    题上计算**，报告里必须写明分母（如 `recall@4 = 0.75 (n=8/10)`），
+>    不许拿全集当分母稀释或抬高。
 
 ---
 

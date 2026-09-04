@@ -8,20 +8,25 @@
 
 ---
 
-## 当前进度：M2 / M6（被测系统就绪）
+## 当前进度：M3 / M6（评测集与自定义指标就绪）
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
 | M1 | 目录骨架、依赖锁版本、config、`.env` 载入、DeepSeek 客户端封装、hello-world LangGraph 图 | ✅ 完成 |
 | M2 | RAG（切分 → FAISS → 检索）+ 两个工具 + ReAct 图 + 轨迹记录 | ✅ 完成 |
-| M3 | 30–50 条自建黄金集；recall@k / 任务成功率 / 工具调用准确率 / 多轮一致性 | ⬜ |
+| M3 | 36 条自建黄金集；recall@k / 任务成功率 / 工具调用准确率 / 多轮一致性 | ✅ 完成 |
 | M4 | RAGAS：faithfulness / answer_relevancy / context recall | ⬜ |
 | M5 | LLM-as-Judge + 人工标注对照，Cohen's kappa | ⬜ |
 | M6 | GitHub Actions 指标回归门禁 + README 定稿 | ⬜ |
 
-> **指标区暂缺，是有意为之。** 本项目的第一红线是「禁止编造任何指标」——
-> README 里出现的每个数字都必须能由仓库里的一条命令重新跑出来。
-> 评测集和指标要到 M3 才存在，所以现在这里一个数字都没有。
+> **指标见 [reports/report.md](reports/report.md)，此处暂不摘抄。**
+> 第一红线是「禁止编造任何指标」——README 里出现的每个数字都必须能由
+> 仓库里的一条命令重新跑出来。M3 的第一份报告已经产出，但 M4/M5 的
+> faithfulness 与 kappa 还没有，简历 bullet 要等 M6 定稿时一次性填真值。
+>
+> 复现命令：`python -m src.eval.report`（需要 DEEPSEEK_API_KEY，会产生费用）。
+> 报告里记录了模型名、embedding 模型、top-k、切分参数与 git commit，
+> 缺一样这个数字就不可复现。
 
 ---
 
@@ -53,6 +58,9 @@ pytest -m live
 python -m src.agent.rag --build                       # 建 FAISS 索引（首次会下载 BGE 模型）
 python -m src.agent.rag --list                        # 列出 doc_id -> 出处，标注黄金集时用
 python -m src.agent.graph --trace "PSI 告警阈值定在多少？"   # 跑 Agent 并打印完整轨迹
+
+python -m src.eval.report --limit 5 --no-consistency   # 小子集试跑（省钱）
+python -m src.eval.report                              # 全量评测，出 reports/
 ```
 
 ---
