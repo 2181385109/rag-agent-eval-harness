@@ -1,0 +1,35 @@
+# ---- 密钥：第一优先，绝不提交 ----
+.env
+.env.local
+*.key
+api*.txt
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# ---- 测试 / 工具缓存 ----
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ---- 向量索引 / 模型缓存（体积大，可由代码重建）----
+.cache/
+index/
+*.faiss
+*.index
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

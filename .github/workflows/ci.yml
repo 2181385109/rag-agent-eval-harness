@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests (no live API calls)
+        # CI 上没有 DEEPSEEK_API_KEY，也刻意不放：
+        # 省钱 + 结果确定（CLAUDE.md §7）。live 标记的测试整体排除。
+        run: pytest -m "not live"
+
+      # TODO(M6): 指标回归门禁——跑固定小子集（LLM 打桩/读缓存响应），
+      # 与 reports/ 里的基线比对，关键指标跌破 config.METRIC_DROP_TOLERANCE 即 fail。

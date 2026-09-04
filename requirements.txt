@@ -1,0 +1,17 @@
+# Python 3.12（本机无 3.11，已与项目负责人确认后调整；CLAUDE.md §2 的其余选型不变）
+# 版本号 = 实际安装并跑通测试的版本，逐里程碑增补，不预先写没装的包。
+
+# ---- M1：编排 + 模型 + 配置 ----
+langgraph==1.2.11
+langchain-core==1.6.1
+openai==3.8.0            # DeepSeek 走 OpenAI 兼容端点
+python-dotenv==1.2.3
+pydantic==2.13.5
+
+# ---- 测试 / 门禁 ----
+pytest==9.1.1
+
+# ---- M2 将增补：faiss-cpu, sentence-transformers, langchain-text-splitters
+# ---- M3 将增补：pandas, numpy
+# ---- M4 将增补：ragas, langchain-openai
+# ---- M5 将增补：scikit-learn（cohen_kappa_score）
