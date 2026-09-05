@@ -138,3 +138,30 @@ def test_invalid_human_score_rejected(tmp_path):
     path.write_text(json.dumps({"id": "a", "human_score": 5}) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="0/1/2"):
         judge.load_human_labels(path)
+
+
+# ------------------------------------------------ 含片段全文的完整版标注表
+def test_full_sheet_includes_chunk_text(open_samples):
+    """标注时对某题拿不准，需要能直接读到 Agent 当时看到的原文。"""
+    samples, traces = open_samples
+    traces["cap_007"] = make_trace(
+        answer="信贷用分层切分，航班用 GroupKFold。",
+        tools=["retrieve"],
+        retrieved=[["c730fa5c_0019"]],
+    )
+    traces["cap_007"].steps[0].results[0].retrieved[0].text = "这是被检索到的原文片段"
+
+    brief = judge.build_labeling_sheet(samples, traces)
+    full = judge.build_labeling_sheet(samples, traces, include_chunk_text=True)
+
+    assert "这是被检索到的原文片段" not in brief, "默认版不塞全文，否则表会长到没法读"
+    assert "这是被检索到的原文片段" in full
+
+
+def test_full_sheet_still_hides_judge_scores(open_samples):
+    """加了全文也不能顺手把裁判结论漏进来。"""
+    samples, traces = open_samples
+    full = judge.build_labeling_sheet(
+        samples, traces, judge_scores={"cap_007": 2}, include_chunk_text=True
+    )
+    assert "judge_score" not in full

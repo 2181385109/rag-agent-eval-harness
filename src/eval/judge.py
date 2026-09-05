@@ -43,6 +43,7 @@ def build_labeling_sheet(
     samples: Sequence[GoldenSample],
     traces: Mapping[str, AgentTrace],
     judge_scores: Mapping[str, int] | None = None,  # 刻意忽略，见模块 docstring
+    include_chunk_text: bool = False,
 ) -> str:
     """生成给人看的标注表（Markdown）。"""
     del judge_scores  # 绝不写进表里：人必须独立于机器判定
@@ -87,12 +88,12 @@ def build_labeling_sheet(
     for index, sample in enumerate(targets, start=1):
         trace = traces.get(sample.id)
         answer = (trace.answer if trace else "") or "（本轮没有产出答案）"
-        sources = []
+        # 去重保序：Agent 多次检索时同一块可能重复出现
+        seen_chunks: dict[str, object] = {}
         if trace:
-            seen: dict[str, None] = {}
             for chunk in trace.retrieved_chunks:
-                seen.setdefault(f"{chunk.doc_id}  {chunk.source}", None)
-            sources = list(seen)
+                seen_chunks.setdefault(chunk.doc_id, chunk)
+        sources = [f"{c.doc_id}  {c.source}" for c in seen_chunks.values()]
 
         lines += [
             f"### {index}. `{sample.id}`"
@@ -113,7 +114,20 @@ def build_labeling_sheet(
             f"<details><summary>检索到的片段（{len(sources)} 块）</summary>",
             "",
         ]
-        lines += [f"- `{item}`" for item in sources] or ["- （未检索）"]
+        if not seen_chunks:
+            lines.append("- （未检索）")
+        elif include_chunk_text:
+            for chunk in seen_chunks.values():
+                lines += [
+                    f"**`{chunk.doc_id}`**  ·  {chunk.source}",
+                    "",
+                ]
+                lines += [
+                    f"> {ln}" if ln.strip() else ">" for ln in chunk.text.splitlines()
+                ]
+                lines.append("")
+        else:
+            lines += [f"- `{item}`" for item in sources]
         lines += [
             "",
             "</details>",
@@ -131,10 +145,14 @@ def write_labeling_sheet(
     samples: Sequence[GoldenSample],
     traces: Mapping[str, AgentTrace],
     path: Path | None = None,
+    include_chunk_text: bool = False,
 ) -> Path:
     target = path or (config.REPORTS_DIR / SHEET_FILENAME)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(build_labeling_sheet(samples, traces), encoding="utf-8")
+    target.write_text(
+        build_labeling_sheet(samples, traces, include_chunk_text=include_chunk_text),
+        encoding="utf-8",
+    )
     return target
 
 
@@ -200,6 +218,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="裁判层与人工标注")
     parser.add_argument("--sheet", action="store_true", help="生成人工标注表与空白骨架")
     parser.add_argument(
+        "--full", action="store_true", help="标注表里附上检索片段全文（篇幅会大很多）"
+    )
+    parser.add_argument(
         "--traces",
         type=str,
         default=None,
@@ -212,7 +233,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.sheet:
         samples = load_golden_set()
         traces = load_traces(args.traces or (config.REPORTS_DIR / TRACES_FILENAME))
-        sheet = write_labeling_sheet(samples, traces)
+        sheet = write_labeling_sheet(
+            samples,
+            traces,
+            path=config.REPORTS_DIR / (
+                SHEET_FILENAME.replace('.md', '_full.md') if args.full else SHEET_FILENAME
+            ),
+            include_chunk_text=args.full,
+        )
         skeleton = write_label_skeleton(samples, traces)
         print(f"标注表：{sheet}")
         print(f"空白骨架：{skeleton}")
