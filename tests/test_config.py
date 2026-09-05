@@ -61,3 +61,14 @@ def test_external_tracing_is_disabled():
 
     assert os.environ.get("LANGSMITH_TRACING") == "false"
     assert os.environ.get("LANGCHAIN_TRACING_V2") == "false"
+
+
+def test_judge_model_differs_from_model_under_test():
+    """裁判必须与被测模型不同源，否则是自己判自己（自评偏好）。
+
+    这是一个有意识的评测设计选择，不是随手配的——所以用测试钉住，
+    以后谁把它改回同一个模型都会立刻红。
+    """
+    assert config.JUDGE_MODEL_NAME != config.MODEL_NAME, (
+        "裁判与被测同款会引入自评偏好，kappa 和 faithfulness 都会失去可信度"
+    )

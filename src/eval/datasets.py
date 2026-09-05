@@ -33,9 +33,41 @@ class GoldenSample(BaseModel):
     reference_answer: str
     answer_keys: list[str] = Field(default_factory=list)
     expected_tool: list[str]
-    expected_doc_ids: list[str] = Field(default_factory=list)
+    # 证据组：外层是「必须都覆盖到」的组，组内是「任一命中即可」的替代块。
+    # 裸字符串会被归一成单元素组，所以单块标注仍可简写成 ['abc_0001']。
+    expected_doc_ids: list[list[str]] = Field(default_factory=list)
     answer_type: AnswerType
     failure_tag: str | None = None
+
+    @field_validator("expected_doc_ids", mode="before")
+    @classmethod
+    def _normalize_doc_groups(cls, value):
+        """把 ['a', ['b','c']] 归一成 [['a'], ['b','c']]。
+
+        为什么要分组：像「两个项目各自怎么防数据泄露」这种题，信贷侧有三块都能作答、
+        航班侧有两块都能作答。摊平成一个列表再要求全中，答得再完美也到不了 1.0——
+        那衡量的不是召回质量，是运气。分组后 recall 的分母是**组数**，
+        组内命中任一即算该组已召回。
+        """
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise ValueError("expected_doc_ids 必须是列表")
+        groups: list[list[str]] = []
+        for item in value:
+            if isinstance(item, str):
+                groups.append([item])
+            elif isinstance(item, list):
+                if not item:
+                    raise ValueError("证据组不能为空组：空组会让分母多一格却永远命不中")
+                if not all(isinstance(x, str) for x in item):
+                    raise ValueError("证据组里必须都是 doc_id 字符串")
+                groups.append(list(item))
+            else:
+                raise ValueError(
+                    f"expected_doc_ids 元素只能是字符串或字符串列表，收到 {type(item)}"
+                )
+        return groups
 
     @field_validator("expected_tool")
     @classmethod
@@ -61,8 +93,13 @@ class GoldenSample(BaseModel):
         return self
 
     @property
+    def all_doc_ids(self) -> list[str]:
+        """摊平后的全部 doc_id，用于校验标注是否都存在于语料。"""
+        return [doc_id for group in self.expected_doc_ids for doc_id in group]
+
+    @property
     def is_scored_for_recall(self) -> bool:
-        """是否参与 recall@k（有标注应检索文档的题才参与）。"""
+        """是否参与 recall@k（有标注证据组的题才参与）。"""
         return bool(self.expected_doc_ids)
 
     @property

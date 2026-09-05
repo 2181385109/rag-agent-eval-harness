@@ -146,17 +146,26 @@ def _first_retrieve_doc_ids(trace: AgentTrace) -> list[str]:
     return []
 
 
+def _group_recall(sample: GoldenSample, retrieved: set[str]) -> float | None:
+    """按**证据组**算召回：分母是组数，组内命中任一即算该组已召回。
+
+    组内是替代关系（同一件事有好几块都能作答），组间是并列关系（几件事都要答到）。
+    摊平成文档列表再要求全中会系统性低估召回——这是 M5 前置修订的原因。
+    没有标注证据组的题返回 None：对它无定义，不能当 0 拉低均值。
+    """
+    if not sample.expected_doc_ids:
+        return None
+    hit = sum(1 for group in sample.expected_doc_ids if any(d in retrieved for d in group))
+    return hit / len(sample.expected_doc_ids)
+
+
 def recall_at_k(sample: GoldenSample, trace: AgentTrace) -> float | None:
     """单题 recall@k：标注的应检索文档，有多少比例出现在**全部检索结果**里。
 
     用并集而不是单次结果，衡量的是"Agent 最终有没有看到证据"。
     没有标注应检索文档的题返回 None——对它无定义，不能当 0。
     """
-    if not sample.expected_doc_ids:
-        return None
-    retrieved = set(trace.retrieved_doc_ids)
-    hit = sum(1 for d in sample.expected_doc_ids if d in retrieved)
-    return hit / len(sample.expected_doc_ids)
+    return _group_recall(sample, set(trace.retrieved_doc_ids))
 
 
 def recall_at_k_first_call(sample: GoldenSample, trace: AgentTrace) -> float | None:
@@ -166,11 +175,7 @@ def recall_at_k_first_call(sample: GoldenSample, trace: AgentTrace) -> float | N
     不是"在原始问题文本上的表现"——Agent 在发出第一次检索前就已经改写过 query 了。
     两版并列上报，差值反映的是**多次检索**（而非查询改写）捞回了多少。
     """
-    if not sample.expected_doc_ids:
-        return None
-    retrieved = set(_first_retrieve_doc_ids(trace))
-    hit = sum(1 for d in sample.expected_doc_ids if d in retrieved)
-    return hit / len(sample.expected_doc_ids)
+    return _group_recall(sample, set(_first_retrieve_doc_ids(trace)))
 
 
 def aggregate_recall(

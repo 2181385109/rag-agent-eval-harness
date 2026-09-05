@@ -127,7 +127,7 @@ def test_every_expected_doc_id_exists_in_corpus():
 
     known = {c.doc_id for c in rag.build_chunks()}
     dangling = {
-        s.id: [d for d in s.expected_doc_ids if d not in known]
+        s.id: [d for d in s.all_doc_ids if d not in known]
         for s in datasets.load_golden_set()
     }
     dangling = {k: v for k, v in dangling.items() if v}
@@ -142,3 +142,42 @@ def test_dataset_has_both_tools_and_both_answer_types():
     assert {s.answer_type for s in samples} == {"closed", "open"}
     assert any(len(s.expected_tool) > 1 for s in samples), "至少要有一道多工具题"
     assert any(s.failure_tag == "hallucination_bait" for s in samples), "至少要有一道幻觉诱饵"
+
+
+# ------------------------------------------------ 证据组建模（M5 前置修订）
+def test_bare_string_becomes_a_single_element_group():
+    """单块证据仍写成裸字符串，解析后归一为一个单元素组——标注不必变啰嗦。"""
+    s = datasets.GoldenSample(**_sample(expected_doc_ids=["abc12345_0000"]))
+    assert s.expected_doc_ids == [["abc12345_0000"]]
+
+
+def test_nested_list_is_kept_as_a_group():
+    """组内是替代关系：任一命中即算该组召回。"""
+    s = datasets.GoldenSample(
+        **_sample(expected_doc_ids=[["a_0001", "a_0002"], ["b_0001"]])
+    )
+    assert s.expected_doc_ids == [["a_0001", "a_0002"], ["b_0001"]]
+
+
+def test_mixed_form_is_normalized():
+    s = datasets.GoldenSample(**_sample(expected_doc_ids=["a_0001", ["b_0001", "b_0002"]]))
+    assert s.expected_doc_ids == [["a_0001"], ["b_0001", "b_0002"]]
+
+
+def test_empty_group_rejected():
+    """空组会让 recall 的分母凭空多一格却永远命不中，属于标注错误。"""
+    with pytest.raises(ValidationError):
+        datasets.GoldenSample(**_sample(expected_doc_ids=[[]]))
+
+
+def test_all_doc_ids_flattens_groups():
+    """完整性校验（doc_id 是否存在于语料）需要摊平后的全集。"""
+    s = datasets.GoldenSample(**_sample(expected_doc_ids=[["a", "b"], ["c"]]))
+    assert s.all_doc_ids == ["a", "b", "c"]
+
+
+def test_no_groups_means_not_scored_for_recall():
+    s = datasets.GoldenSample(**_sample(expected_doc_ids=[], expected_tool=["calc"]))
+    assert s.expected_doc_ids == []
+    assert s.is_scored_for_recall is False
+    assert s.all_doc_ids == []

@@ -27,9 +27,11 @@ os.environ.setdefault("LANGCHAIN_TRACING_V2", "false")
 BASE_URL = "https://api.deepseek.com/v1"
 MODEL_NAME = "deepseek-chat"
 
-# 裁判模型（M5）。v1 先与被测模型同款；想避免"自己判自己"的自评偏好，
-# 可改成 deepseek-reasoner —— 这是一个有意识的评测设计选择。
-JUDGE_MODEL_NAME = "deepseek-chat"
+# 裁判模型。**刻意与被测模型不同源**：被测是 deepseek-chat，裁判用 deepseek-reasoner，
+# 避免"自己判自己"的自评偏好（同一模型倾向于给自己的输出打高分）。
+# 注意这个值同时决定 RAGAS 的裁判模型，改它会让 faithfulness 等指标整体变动，
+# 报告的 meta 里记了实际用的是哪个，换模型必须重跑才能与配置对上。
+JUDGE_MODEL_NAME = "deepseek-reasoner"
 
 API_KEY_ENV = "DEEPSEEK_API_KEY"
 

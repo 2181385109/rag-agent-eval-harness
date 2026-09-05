@@ -233,3 +233,43 @@ def test_consistency_requires_at_least_two_runs():
     s = make_sample()
     with pytest.raises(ValueError):
         metrics.consistency([s], {"q1": [make_trace(answer="x")]})
+
+
+# ------------------------------------------------ 证据组下的 recall（修订）
+def test_recall_counts_groups_not_documents():
+    """组内任一命中即算该组召回；分母是组数，不是文档数。
+
+    起因：cap_007 问"两个项目各自怎么防数据泄露"，信贷侧有三块都能作答、
+    航班侧有两块都能作答。按扁平口径要求五块全中，答得再完美也到不了 1.0——
+    那衡量的不是召回，是运气。
+    """
+    s = make_sample(expected_doc_ids=[["a1", "a2", "a3"], ["b1", "b2"]])
+    t = make_trace(tools=["retrieve"], retrieved=[["a2", "zz"]])
+    assert metrics.recall_at_k(s, t) == 0.5  # 命中 1 组 / 共 2 组
+
+
+def test_recall_full_when_every_group_has_one_hit():
+    s = make_sample(expected_doc_ids=[["a1", "a2"], ["b1", "b2"]])
+    t = make_trace(tools=["retrieve"], retrieved=[["a1", "b2"]])
+    assert metrics.recall_at_k(s, t) == 1.0
+
+
+def test_extra_hits_in_one_group_do_not_inflate():
+    """一组里命中两块也只算一组，不能靠堆同组文档把分数刷上去。"""
+    s = make_sample(expected_doc_ids=[["a1", "a2"], ["b1"]])
+    t = make_trace(tools=["retrieve"], retrieved=[["a1", "a2"]])
+    assert metrics.recall_at_k(s, t) == 0.5
+
+
+def test_single_doc_annotation_behaves_as_before():
+    """单块标注归一成单元素组后，语义与旧口径完全一致。"""
+    s = make_sample(expected_doc_ids=["d1"])
+    assert metrics.recall_at_k(s, make_trace(tools=["retrieve"], retrieved=[["d1"]])) == 1.0
+    assert metrics.recall_at_k(s, make_trace(tools=["retrieve"], retrieved=[["zz"]])) == 0.0
+
+
+def test_first_call_recall_also_uses_groups():
+    s = make_sample(expected_doc_ids=[["a1", "a2"], ["b1"]])
+    t = make_trace(tools=["retrieve", "retrieve"], retrieved=[["a1"], ["b1"]])
+    assert metrics.recall_at_k(s, t) == 1.0
+    assert metrics.recall_at_k_first_call(s, t) == 0.5
