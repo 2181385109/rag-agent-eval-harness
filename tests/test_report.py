@@ -318,6 +318,9 @@ def test_ragas_baseline_renders_side_by_side(tiny_eval):
     baseline = {
         "judge_model": "deepseek-chat",
         "scores": {"faithfulness": 0.86, "context_precision": 0.66},
+        # 两侧打分行数一致，差值才可比——不一致时表格会标「不可比」
+        "scored_counts": {"faithfulness": 3, "context_precision": 3},
+        "n_submitted": 3,
     }
     report = report_mod.build_report(samples, traces, ragas=current, ragas_baseline=baseline)
     md = report_mod.render_markdown(report)
@@ -350,3 +353,45 @@ def test_extract_ragas_block_from_previous_report(tmp_path):
 
 def test_missing_previous_report_returns_none(tmp_path):
     assert report_mod.load_ragas_baseline(tmp_path / "nope.json") is None
+
+
+def test_baseline_comparison_flags_non_comparable_rows(tiny_eval):
+    """两次运行打分行数不同的指标，差值没有可比性，必须标出来。
+
+    真踩过：换裁判后 faithfulness 因超时只打了 31/35 行，而基线是 35/35，
+    差值 -0.000 看着像"换裁判没影响"，其实是在比两个不同的子集。
+    """
+    samples, traces = tiny_eval
+    current = {
+        "judge_model": "deepseek-reasoner",
+        "scores": {"faithfulness": 0.86, "answer_relevancy": 0.82},
+        "scored_counts": {"faithfulness": 31, "answer_relevancy": 35},
+        "n_submitted": 35, "n_excluded": 0, "total": 36, "excluded": [],
+        "has_incomplete_metric": True,
+    }
+    baseline = {
+        "judge_model": "deepseek-chat",
+        "scores": {"faithfulness": 0.86, "answer_relevancy": 0.84},
+        "scored_counts": {"faithfulness": 35, "answer_relevancy": 35},
+    }
+    md = report_mod.render_markdown(
+        report_mod.build_report(samples, traces, ragas=current, ragas_baseline=baseline)
+    )
+    assert "不可比" in md
+    assert "31/35" in md and "35/35" in md
+
+
+def test_baseline_extraction_keeps_scored_counts(tmp_path):
+    import json as _json
+
+    path = tmp_path / "prev.json"
+    path.write_text(
+        _json.dumps({"metrics": {"ragas": {
+            "judge_model": "deepseek-chat",
+            "scores": {"faithfulness": 0.86},
+            "scored_counts": {"faithfulness": 35},
+        }}}),
+        encoding="utf-8",
+    )
+    block = report_mod.load_ragas_baseline(path)
+    assert block["scored_counts"]["faithfulness"] == 35

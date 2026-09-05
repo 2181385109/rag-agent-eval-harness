@@ -43,9 +43,11 @@ REQUEST_TIMEOUT_S = 60.0
 # RAGAS 裁判的调用比 Agent 重得多（faithfulness 要拆句逐条核验，
 # context_precision 还要对每个 context 单独判），60s 会大面积超时——
 # 实测：60s/16 并发 -> context_precision 只打出 16/35；
-# 180s/4 并发 -> 8/9；仍有长尾任务超时，故再放宽到 300s/2 并发。
+# 180s/4 并发 -> 8/9；300s/2 并发 -> chat 裁判 35/35。
+# 换 deepseek-reasoner 后 300s 又不够（推理 token 让单次调用更慢，
+# faithfulness 只打了 31/35），故放宽到 600s。
 # 评测是离线批处理，稳比快重要。
-JUDGE_TIMEOUT_S = 300.0
+JUDGE_TIMEOUT_S = 600.0
 RAGAS_MAX_WORKERS = 2  # RAGAS 默认 16 并发，对 DeepSeek 太激进；降到 2 换取长尾任务不超时
 MAX_RETRIES = 2
 

@@ -205,7 +205,12 @@ def load_ragas_baseline(path: Path | str) -> dict | None:
     block = (payload.get("metrics") or {}).get("ragas")
     if not block:
         return None
-    return {"judge_model": block.get("judge_model"), "scores": block.get("scores") or {}}
+    return {
+        "judge_model": block.get("judge_model"),
+        "scores": block.get("scores") or {},
+        "scored_counts": block.get("scored_counts") or {},
+        "n_submitted": block.get("n_submitted"),
+    }
 
 
 def _fmt(value: float | None) -> str:
@@ -309,18 +314,45 @@ def render_markdown(report: dict) -> str:
             f"`{base.get('judge_model')}` → `{rg.get('judge_model')}`。"
             "差值反映的是**评分标准本身有多依赖裁判模型**，与被测 Agent 无关。",
             "",
-            "| 指标 | " + f"{base.get('judge_model')} | {rg.get('judge_model')} | 差值 |",
-            "|---|---|---|---|",
+            "| 指标 | "
+            + f"{base.get('judge_model')} | {rg.get('judge_model')} | 差值 | 打分行数 |",
+            "|---|---|---|---|---|",
         ]
+        base_counts = base.get("scored_counts") or {}
+        new_counts = rg.get("scored_counts") or {}
+        base_n = base.get("n_submitted")
+        new_n = rg.get("n_submitted")
+        incomparable = []
+
         for name, new_value in (rg.get("scores") or {}).items():
             old_value = (base.get("scores") or {}).get(name)
-            if old_value is None:
-                lines.append(f"| {name} | — | {_fmt(new_value)} | — |")
-                continue
-            delta = new_value - old_value
-            lines.append(
-                f"| {name} | {_fmt(old_value)} | {_fmt(new_value)} | {delta:+.3f} |"
+            b_cnt, n_cnt = base_counts.get(name), new_counts.get(name)
+            span = (
+                f"{b_cnt}/{base_n} → {n_cnt}/{new_n}"
+                if b_cnt is not None and n_cnt is not None
+                else "—"
             )
+            if old_value is None:
+                lines.append(f"| {name} | — | {_fmt(new_value)} | — | {span} |")
+                continue
+
+            # 两次打分覆盖的行不同，均值就不是在同一批样本上算的，差值没有可比性。
+            same_span = b_cnt is not None and n_cnt is not None and b_cnt == n_cnt
+            delta = f"{new_value - old_value:+.3f}" if same_span else "**不可比**"
+            if not same_span:
+                incomparable.append(name)
+            lines.append(
+                f"| {name} | {_fmt(old_value)} | {_fmt(new_value)} | {delta} | {span} |"
+            )
+
+        if incomparable:
+            lines += [
+                "",
+                f"> ⚠ **{'、'.join(incomparable)} 的差值不可比**：两次运行打分成功的行数不同，"
+                "均值是在不同子集上算的。看着像「换裁判没影响」的 0.000 差值，"
+                "很可能只是两个不同样本集碰巧接近。要得到可比的对照，"
+                "必须两次都打满同样的行数。",
+            ]
 
     anomalies = report.get("anomalies") or []
     if anomalies:
