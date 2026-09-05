@@ -78,10 +78,14 @@ class ReActAgent:
         toolbox: tools_mod.ToolBox,
         model: str | None = None,
         max_steps: int | None = None,
+        temperature: float | None = None,
     ):
         self.toolbox = toolbox
         self.model = model or config.MODEL_NAME
         self.max_steps = max_steps or config.MAX_AGENT_STEPS
+        # None 表示走 config.DEFAULT_TEMPERATURE（0，为可复现）；
+        # 多轮一致性专测会显式传一个 >0 的值来探鲁棒性。
+        self.temperature = temperature
         self.graph = self._build_graph()
 
     # ------------------------------------------------------------- 节点
@@ -91,6 +95,7 @@ class ReActAgent:
             state["messages"],
             model=self.model,
             tools=self.toolbox.schemas(),
+            temperature=self.temperature,
         )
         message = resp.choices[0].message
         raw_calls = getattr(message, "tool_calls", None) or []
@@ -199,12 +204,17 @@ class ReActAgent:
 
 
 def build_agent(
-    toolbox: tools_mod.ToolBox, model: str | None = None, max_steps: int | None = None
+    toolbox: tools_mod.ToolBox,
+    model: str | None = None,
+    max_steps: int | None = None,
+    temperature: float | None = None,
 ) -> ReActAgent:
-    return ReActAgent(toolbox, model=model, max_steps=max_steps)
+    return ReActAgent(toolbox, model=model, max_steps=max_steps, temperature=temperature)
 
 
-def build_default_agent(model: str | None = None) -> ReActAgent:
+def build_default_agent(
+    model: str | None = None, temperature: float | None = None
+) -> ReActAgent:
     """用真实 BGE + FAISS 组一个 Agent；索引已落盘就直接读，没有就现建。"""
     from src.agent import rag
 
@@ -212,7 +222,7 @@ def build_default_agent(model: str | None = None) -> ReActAgent:
         retriever = rag.Retriever.load()
     except FileNotFoundError:
         retriever = rag.Retriever.build()
-    return build_agent(tools_mod.ToolBox(retriever), model=model)
+    return build_agent(tools_mod.ToolBox(retriever), model=model, temperature=temperature)
 
 
 def ask(question: str) -> str:

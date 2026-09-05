@@ -4,7 +4,9 @@
 # ---- M1：编排 + 模型 + 配置 ----
 langgraph==1.2.11
 langchain-core==1.6.1
-openai==3.8.0            # DeepSeek 走 OpenAI 兼容端点
+openai==2.54.0           # DeepSeek 走 OpenAI 兼容端点。
+                         # 注：M1 装的是 3.8.0，M4 装 ragas 时被它拽回 2.54.0。
+                         # 已复跑全量测试 + live 冒烟确认 DeepSeek 调用不受影响。
 python-dotenv==1.2.3
 pydantic==2.13.5
 
@@ -16,6 +18,18 @@ faiss-cpu==1.15.0
 sentence-transformers==6.0.1   # 传递依赖：torch 2.14.0, transformers 5.16.1
 langchain-text-splitters==1.1.2
 
-# ---- M3 将增补：pandas, numpy
-# ---- M4 将增补：ragas, langchain-openai
+# ---- 数据处理（rag.py 直接用 numpy；ragas_runner 用 pandas 读回评分表）----
+numpy==2.5.2
+pandas==3.0.5
+
+# ---- M4：RAGAS 生成质量指标 ----
+ragas==0.4.3
+langchain-openai==1.6.0
+# ragas 会连带装入 langchain 1.4.0 / langchain-community 0.4.2 / datasets 5.0.1。
+# 已知不兼容：ragas 0.4.3 在模块加载时硬导入
+#   langchain_community.chat_models.vertexai —— 该模块只存在于 community 0.3.x 布局。
+# 降 community 会把 langchain-core 拽到 0.3.86，而 langgraph 1.2.11 要求 core>=1.0，
+# 等于推翻 M1–M3。故在 src/eval/ragas_runner._ensure_ragas_importable 里做条件式隔离，
+# 并有 tests/test_ragas_runner.py 守着（上游修复后该补丁自动失效）。
+
 # ---- M5 将增补：scikit-learn（cohen_kappa_score）

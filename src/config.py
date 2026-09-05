@@ -37,6 +37,14 @@ API_KEY_ENV = "DEEPSEEK_API_KEY"
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_MAX_TOKENS = 1024
 REQUEST_TIMEOUT_S = 60.0
+
+# RAGAS 裁判的调用比 Agent 重得多（faithfulness 要拆句逐条核验，
+# context_precision 还要对每个 context 单独判），60s 会大面积超时——
+# 实测：60s/16 并发 -> context_precision 只打出 16/35；
+# 180s/4 并发 -> 8/9；仍有长尾任务超时，故再放宽到 300s/2 并发。
+# 评测是离线批处理，稳比快重要。
+JUDGE_TIMEOUT_S = 300.0
+RAGAS_MAX_WORKERS = 2  # RAGAS 默认 16 并发，对 DeepSeek 太激进；降到 2 换取长尾任务不超时
 MAX_RETRIES = 2
 
 # ---------------------------------------------------------------------- 路径
@@ -78,6 +86,9 @@ MAX_AGENT_STEPS = 6
 CONSISTENCY_RUNS = 5  # 多轮一致性：同题跑几次
 # 一致性要跑 K 倍的量，成本随题数线性涨；默认只在前若干题上测，报告里写明覆盖数。
 CONSISTENCY_SUBSET_SIZE = 10
+# 主评测锁 temp=0 保可复现，但那样一致性几乎恒为 1.0、没有信息量。
+# 另跑一档 temp>0 专门测鲁棒性，两者并存报数，互不替代。
+CONSISTENCY_TEMPERATURE = 0.7
 
 # -------------------------------------------------------- 回归门禁（M6 生效）
 # 与信贷风控项目里 PSI 触发告警同一思路：指标相对基线跌超容差就 fail。

@@ -160,3 +160,23 @@ def test_trace_is_serializable(agent, scripted_llm):
     )
     trace = agent.run("什么是过拟合？")
     assert trace.model_dump_json()
+
+
+# ------------------------------------------------- 温度（多轮一致性专测用）
+def test_agent_defaults_to_config_temperature(agent, scripted_llm):
+    """主评测锁 temp=0 保证可复现——默认不传就是走 config。"""
+    script, calls = scripted_llm
+    script(answer_message("答"))
+    agent.run("问题")
+    assert calls[0]["kwargs"].get("temperature") in (None, config.DEFAULT_TEMPERATURE)
+
+
+def test_agent_temperature_is_passed_through(tiny_corpus, fake_embedder, scripted_llm):
+    """一致性专测要在 temp>0 下跑，温度必须真的传到模型调用上。"""
+    script, calls = scripted_llm
+    script(answer_message("答"))
+
+    box = tools.ToolBox(rag.Retriever.build(tiny_corpus, embedder=fake_embedder))
+    graph.build_agent(box, temperature=0.7).run("问题")
+
+    assert calls[0]["kwargs"]["temperature"] == 0.7

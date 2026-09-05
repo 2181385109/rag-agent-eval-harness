@@ -23,7 +23,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from src import config
 from src.agent.trace import AgentTrace
@@ -81,6 +81,9 @@ def build_report(
     samples: Sequence[GoldenSample],
     traces: dict[str, AgentTrace],
     consistency_runs: dict[str, list[AgentTrace]] | None = None,
+    consistency_runs_hot: dict[str, list[AgentTrace]] | None = None,
+    consistency_temperature: float | None = None,
+    ragas: dict | None = None,
     notes: str = "",
 ) -> dict:
     """把轨迹汇总成一份完整报告（纯函数，可在 CI 里用构造轨迹验证）。"""
@@ -90,10 +93,17 @@ def build_report(
     tool = metrics.tool_accuracy(samples, traces)
     tool_set = metrics.tool_set_accuracy(samples, traces)
 
-    consistency = None
-    if consistency_runs:
-        subset = [s for s in samples if s.id in consistency_runs]
-        consistency = metrics.consistency(subset, consistency_runs).as_dict()
+    def _consistency(runs, temperature):
+        if not runs:
+            return None
+        subset = [s for s in samples if s.id in runs]
+        payload = metrics.consistency(subset, runs).as_dict()
+        payload["temperature"] = temperature
+        return payload
+
+    # 两档并存：temp=0 是主评测的可复现基线，temp>0 才测得出鲁棒性。
+    consistency = _consistency(consistency_runs, config.DEFAULT_TEMPERATURE)
+    consistency_hot = _consistency(consistency_runs_hot, consistency_temperature)
 
     prompt_tokens = sum(t.prompt_tokens for t in traces.values())
     completion_tokens = sum(t.completion_tokens for t in traces.values())
@@ -119,6 +129,32 @@ def build_report(
             }
         )
 
+    # 已发现的失败模式：跑满步数没收口、或最终答案为空。
+    # 这类样本进不了 M4 的 faithfulness/relevancy 均值——没有答案就无从评价答案，
+    # 混进去会让均值失去意义。单独列出，如实说明。
+    anomalies = []
+    for s_ in samples:
+        t = traces.get(s_.id)
+        if t is None:
+            continue
+        empty = not (t.answer or "").strip()
+        if t.stop_reason != "answered" or empty:
+            anomalies.append(
+                {
+                    "id": s_.id,
+                    "failure_tag": s_.failure_tag,
+                    "stop_reason": t.stop_reason,
+                    "empty_answer": empty,
+                    "n_tool_calls": len(t.tool_sequence),
+                    "exclude_from_generation_metrics": empty,
+                    "note": (
+                        "跑满 MAX_AGENT_STEPS 仍未给出答案"
+                        if t.stop_reason == "max_steps" and empty
+                        else ("最终答案为空" if empty else f"非正常结束：{t.stop_reason}")
+                    ),
+                }
+            )
+
     return {
         "meta": {
             "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -141,12 +177,15 @@ def build_report(
             "tool_accuracy": tool.as_dict(),
             "tool_set_accuracy": tool_set.as_dict(),
             "consistency": consistency,
+            "consistency_hot": consistency_hot,
+            "ragas": ragas,
         },
         "tokens": {
             "prompt": prompt_tokens,
             "completion": completion_tokens,
             "total": prompt_tokens + completion_tokens,
         },
+        "anomalies": anomalies,
         "per_question": per_question,
     }
 
@@ -187,24 +226,88 @@ def render_markdown(report: dict) -> str:
             f"| {label} | {_fmt(item['value'])} | n={item['n']}/{item['total']} | {note} |"
         )
 
-    c = m.get("consistency")
-    if c:
+    cold, hot = m.get("consistency"), m.get("consistency_hot")
+    if cold or hot:
         lines += [
             "",
             "## 多轮一致性",
             "",
-            f"- 同题重复次数 K = {c['runs']}，覆盖 {c['n_questions']} 题",
-            f"- 判定一致比例：{_fmt(c['success_agreement'])}（1.0 表示每题 K 次判定完全一致）",
-            f"- 判定结果方差：{_fmt(c['success_variance'])}（同题 K 次 0/1 判定的方差，按题平均）",
-            f"- 工具路径一致比例：{_fmt(c['tool_agreement'])}",
+            "两档并存，互不替代：`temp=0` 是主评测的可复现基线（近乎确定，一致比例天然接近 1.0，"
+            "信息量有限）；`temp>0` 才测得出模型在采样噪声下的鲁棒性。",
+            "",
+            "| 档位 | temperature | K | 覆盖题数 | 判定一致比例 | 判定结果方差 | 工具路径一致比例 |",
+            "|---|---|---|---|---|---|---|",
         ]
+        for label, c in (("可复现基线", cold), ("鲁棒性专测", hot)):
+            if not c:
+                continue
+            lines.append(
+                f"| {label} | {c.get('temperature')} | {c['runs']} | {c['n_questions']} | "
+                f"{_fmt(c['success_agreement'])} | {_fmt(c['success_variance'])} | "
+                f"{_fmt(c['tool_agreement'])} |"
+            )
+        lines.append("")
+        lines.append("> 判定一致比例 1.0 表示每题 K 次判定完全一致；方差是同题 K 次 0/1 判定的方差，按题平均。")
+
+    rg = m.get("ragas")
+    if rg:
+        lines += [
+            "",
+            "## RAGAS（生成质量）",
+            "",
+            f"- 裁判模型：`{rg.get('judge_model')}`；embedding：`{rg.get('embedding_model')}`（本地，不外发）",
+            f"- 提交评测：**{rg.get('n_submitted')}/{rg.get('total')}** 条"
+            f"（排除 {rg.get('n_excluded')} 条：无答案或无检索内容，见下节）",
+            "",
+            "| 指标 | 值 | 实际打分行数 |",
+            "|---|---|---|",
+        ]
+        counts = rg.get("scored_counts") or {}
+        submitted = rg.get("n_submitted") or 0
+        for name, value in (rg.get("scores") or {}).items():
+            got = counts.get(name)
+            flag = "" if got is None or got == submitted else "  ⚠"
+            lines.append(f"| {name} | {_fmt(value)} | {got}/{submitted}{flag} |")
+        if rg.get("has_incomplete_metric"):
+            lines += [
+                "",
+                "> ⚠ **有指标未在全部提交行上打出分**（裁判调用失败或超时，RAGAS 会把该行留空，"
+                "而均值默认跳过空值）。带 ⚠ 的指标覆盖面小于分母，不能当作全量结果引用。",
+            ]
+        excluded = rg.get("excluded") or []
+        if excluded:
+            lines.append("")
+            lines.append("被排除的样本：" + "、".join(
+                f"`{e['id']}`（{e.get('reason', '')}）" for e in excluded
+            ))
+
+    anomalies = report.get("anomalies") or []
+    if anomalies:
+        lines += [
+            "",
+            "## 已发现的失败模式",
+            "",
+            "以下样本未正常收口。**它们如实计入检索与工具类指标，但答案为空者不参与"
+            "生成类指标（M4 的 faithfulness / answer_relevancy）的均值**——"
+            "没有答案就无从评价答案，混进均值只会让指标失去意义。",
+            "",
+            "| id | failure_tag | 停止原因 | 空答案 | 工具调用次数 | 说明 |",
+            "|---|---|---|---|---|---|",
+        ]
+        for a in anomalies:
+            lines.append(
+                f"| {a['id']} | {a['failure_tag'] or '—'} | {a['stop_reason']} | "
+                f"{'是' if a['empty_answer'] else '否'} | {a['n_tool_calls']} | {a['note']} |"
+            )
 
     tok = report["tokens"]
     lines += [
         "",
-        f"## Token 消耗",
+        "## Token 消耗",
         "",
-        f"- prompt {tok['prompt']} + completion {tok['completion']} = **{tok['total']}**",
+        f"- Agent 侧：prompt {tok['prompt']} + completion {tok['completion']} = **{tok['total']}**",
+        "- 注：**不含 RAGAS 裁判与多轮一致性重复运行的开销**——"
+        "这两部分走的是独立调用，本计数只覆盖主评测每题一次的 Agent 运行。",
         "",
         "## 逐题明细",
         "",
@@ -224,8 +327,91 @@ def render_markdown(report: dict) -> str:
     return "\n".join(lines)
 
 
-def write_report(report: dict, directory: Path | None = None) -> dict[str, Path]:
-    """落盘：时间戳快照 + latest.json + report.md。"""
+TRACES_FILENAME = "traces_latest.jsonl"
+CONSISTENCY_COLD_FILENAME = "traces_consistency_cold.jsonl"
+CONSISTENCY_HOT_FILENAME = "traces_consistency_hot.jsonl"
+
+
+def save_traces(
+    traces: Mapping[str, AgentTrace], path: Path, merge: bool = False
+) -> Path:
+    """把轨迹整份落盘。
+
+    M4 的 RAGAS 要 chunk 原文、M5 的裁判要最终答案——都得基于**同一批**轨迹算，
+    否则每加一个指标就得重跑一次 Agent：既烧钱，指标之间也对不上同一次运行。
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # merge=True：只跑了子集（--limit）时，把已有轨迹保留下来再覆盖同名条目。
+    # 轨迹是真金白银跑出来的，不能被一次子集运行顺手截断。
+    payload: dict[str, AgentTrace] = {}
+    if merge and path.exists():
+        payload.update(load_traces(path))
+    payload.update(traces)
+
+    with path.open("w", encoding="utf-8") as fh:
+        for sample_id, trace in payload.items():
+            fh.write(json.dumps({"id": sample_id, "trace": trace.model_dump()}, ensure_ascii=False) + chr(10))
+    return path
+
+
+def load_traces(path: Path | str) -> dict[str, AgentTrace]:
+    """读回落盘的轨迹，用于不重跑 Agent 就补算指标。"""
+    target = Path(path)
+    if not target.exists():
+        raise FileNotFoundError(f"轨迹文件不存在：{target}")
+    out: dict[str, AgentTrace] = {}
+    for line in target.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        out[row["id"]] = AgentTrace.model_validate(row["trace"])
+    return out
+
+
+def save_trace_runs(runs: Mapping[str, Sequence[AgentTrace]], path: Path) -> Path:
+    """把"同题多次运行"的轨迹落盘（一致性用）。
+
+    一次全量评测被中途掐断时，主评测轨迹还在、一致性的 K×N 次运行却白跑了。
+    重复运行比主评测更贵，必须能存下来续用。
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        for sample_id, traces in runs.items():
+            payload = {"id": sample_id, "runs": [t.model_dump() for t in traces]}
+            fh.write(json.dumps(payload, ensure_ascii=False) + chr(10))
+    return path
+
+
+def load_trace_runs(path: Path | str) -> dict[str, list[AgentTrace]]:
+    target = Path(path)
+    if not target.exists():
+        raise FileNotFoundError(f"一致性轨迹文件不存在：{target}")
+    out: dict[str, list[AgentTrace]] = {}
+    for line in target.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        out[row["id"]] = [AgentTrace.model_validate(t) for t in row["runs"]]
+    return out
+
+
+def load_trace_runs_if_present(path: Path | str) -> dict[str, list[AgentTrace]] | None:
+    """文件不存在就返回 None——没跑过一致性是合法状态，报告如实留空。"""
+    try:
+        return load_trace_runs(path)
+    except FileNotFoundError:
+        return None
+
+
+def write_report(
+    report: dict,
+    directory: Path | None = None,
+    traces: Mapping[str, AgentTrace] | None = None,
+    consistency_runs: Mapping[str, Sequence[AgentTrace]] | None = None,
+    consistency_runs_hot: Mapping[str, Sequence[AgentTrace]] | None = None,
+) -> dict[str, Path]:
+    """落盘：时间戳快照 + latest.json + report.md（+ 轨迹）。"""
     target = directory or config.REPORTS_DIR
     target.mkdir(parents=True, exist_ok=True)
     # 去掉 : - 和时区偏移里的 +，文件名对 URL / shell 友好
@@ -240,7 +426,19 @@ def write_report(report: dict, directory: Path | None = None) -> dict[str, Path]
     snapshot.write_text(payload, encoding="utf-8")
     latest.write_text(payload, encoding="utf-8")
     markdown.write_text(render_markdown(report), encoding="utf-8")
-    return {"snapshot": snapshot, "latest": latest, "markdown": markdown}
+
+    paths = {"snapshot": snapshot, "latest": latest, "markdown": markdown}
+    if traces:
+        paths["traces"] = save_traces(traces, target / TRACES_FILENAME, merge=True)
+    if consistency_runs:
+        paths["consistency_cold"] = save_trace_runs(
+            consistency_runs, target / CONSISTENCY_COLD_FILENAME
+        )
+    if consistency_runs_hot:
+        paths["consistency_hot"] = save_trace_runs(
+            consistency_runs_hot, target / CONSISTENCY_HOT_FILENAME
+        )
+    return paths
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -259,6 +457,22 @@ def main(argv: list[str] | None = None) -> int:
         default=config.CONSISTENCY_SUBSET_SIZE,
         help="参与一致性的题数（控制成本）",
     )
+    parser.add_argument(
+        "--consistency-temperature",
+        type=float,
+        default=config.CONSISTENCY_TEMPERATURE,
+        help="鲁棒性专测的温度（主评测始终锁 temp=0）",
+    )
+    parser.add_argument(
+        "--no-hot-consistency", action="store_true", help="跳过 temp>0 的鲁棒性专测"
+    )
+    parser.add_argument("--ragas", action="store_true", help="附带跑 RAGAS 生成质量指标")
+    parser.add_argument(
+        "--from-traces",
+        type=str,
+        default=None,
+        help="复用已落盘的轨迹重算指标，不重跑 Agent（省钱；如只想补 RAGAS）",
+    )
     parser.add_argument("--notes", type=str, default="", help="写进报告的备注")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
@@ -268,23 +482,72 @@ def main(argv: list[str] | None = None) -> int:
     if args.limit:
         samples = samples[: args.limit]
 
-    print(f"黄金集 {len(samples)} 条，构建 Agent（加载 BGE + FAISS）...", file=sys.stderr)
-    agent = graph.build_default_agent()
+    if args.from_traces:
+        print(f"复用已落盘轨迹：{args.from_traces}（不重跑 Agent）", file=sys.stderr)
+        traces = load_traces(args.from_traces)
+        missing = [s.id for s in samples if s.id not in traces]
+        if missing:
+            raise SystemExit(f"轨迹文件缺少这些样本，无法复用：{missing}")
+        traces = {s.id: traces[s.id] for s in samples}
+        agent = None
 
-    print("主评测：每题跑 1 次", file=sys.stderr)
-    main_runs = run_samples(agent, samples, repeats=1)
-    traces = {sid: runs[0] for sid, runs in main_runs.items()}
+        # 一致性那两档也一并读回：否则复用轨迹补算指标时，报告会平白丢掉一致性。
+        trace_dir = Path(args.from_traces).parent
+        consistency_runs = load_trace_runs_if_present(trace_dir / CONSISTENCY_COLD_FILENAME)
+        consistency_runs_hot = load_trace_runs_if_present(trace_dir / CONSISTENCY_HOT_FILENAME)
+        for label, loaded in (("temp=0", consistency_runs), ("temp>0", consistency_runs_hot)):
+            if loaded:
+                print(f"  复用 {label} 一致性轨迹：{len(loaded)} 题", file=sys.stderr)
+    else:
+        print(f"黄金集 {len(samples)} 条，构建 Agent（加载 BGE + FAISS）...", file=sys.stderr)
+        agent = graph.build_default_agent()
+        consistency_runs = None
+        consistency_runs_hot = None
+        print("主评测：每题跑 1 次", file=sys.stderr)
+        main_runs = run_samples(agent, samples, repeats=1)
+        traces = {sid: runs[0] for sid, runs in main_runs.items()}
 
-    consistency_runs = None
-    if not args.no_consistency and args.consistency_size > 0:
+    if agent is not None and not args.no_consistency and args.consistency_size > 0:
         subset = samples[: args.consistency_size]
+
         print(
-            f"多轮一致性：{len(subset)} 题 × {args.consistency_runs} 次", file=sys.stderr
+            f"多轮一致性（可复现基线 temp={config.DEFAULT_TEMPERATURE}）："
+            f"{len(subset)} 题 × {args.consistency_runs} 次",
+            file=sys.stderr,
         )
         consistency_runs = run_samples(agent, subset, repeats=args.consistency_runs)
 
-    report = build_report(samples, traces, consistency_runs, notes=args.notes)
-    paths = write_report(report)
+        if not args.no_hot_consistency:
+            print(
+                f"多轮一致性（鲁棒性专测 temp={args.consistency_temperature}）："
+                f"{len(subset)} 题 × {args.consistency_runs} 次",
+                file=sys.stderr,
+            )
+            hot_agent = graph.build_default_agent(temperature=args.consistency_temperature)
+            consistency_runs_hot = run_samples(hot_agent, subset, repeats=args.consistency_runs)
+
+    ragas_result = None
+    if args.ragas:
+        from src.eval import ragas_runner
+
+        print("RAGAS：基于同一批轨迹算生成质量指标（裁判走 DeepSeek）", file=sys.stderr)
+        ragas_result = ragas_runner.run_ragas(samples, traces)
+
+    report = build_report(
+        samples,
+        traces,
+        consistency_runs=consistency_runs,
+        consistency_runs_hot=consistency_runs_hot,
+        consistency_temperature=args.consistency_temperature,
+        ragas=ragas_result,
+        notes=args.notes,
+    )
+    paths = write_report(
+        report,
+        traces=traces,
+        consistency_runs=consistency_runs,
+        consistency_runs_hot=consistency_runs_hot,
+    )
 
     print()
     print(render_markdown(report))
