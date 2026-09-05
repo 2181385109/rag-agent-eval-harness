@@ -302,3 +302,51 @@ def test_write_report_persists_both_consistency_passes(tiny_eval, tmp_path):
 def test_missing_consistency_file_loads_as_none(tmp_path):
     """没跑过一致性时不应报错，返回 None 让报告如实留空。"""
     assert report_mod.load_trace_runs_if_present(tmp_path / "nope.jsonl") is None
+
+
+# ------------------------------------------- 裁判敏感性对照（M5 前置）
+def test_ragas_baseline_renders_side_by_side(tiny_eval):
+    """同一批轨迹、两个裁判，分数并列——差值本身就是"换裁判影响多大"的证据。"""
+    samples, traces = tiny_eval
+    current = {
+        "judge_model": "deepseek-reasoner",
+        "scores": {"faithfulness": 0.80, "context_precision": 0.70},
+        "scored_counts": {"faithfulness": 3, "context_precision": 3},
+        "n_submitted": 3, "n_excluded": 0, "total": 3, "excluded": [],
+        "has_incomplete_metric": False,
+    }
+    baseline = {
+        "judge_model": "deepseek-chat",
+        "scores": {"faithfulness": 0.86, "context_precision": 0.66},
+    }
+    report = report_mod.build_report(samples, traces, ragas=current, ragas_baseline=baseline)
+    md = report_mod.render_markdown(report)
+
+    assert report["metrics"]["ragas_baseline"]["judge_model"] == "deepseek-chat"
+    assert "裁判敏感性" in md
+    assert "deepseek-reasoner" in md and "deepseek-chat" in md
+    assert "-0.060" in md or "−0.060" in md, "必须把差值算出来，不能让人自己减"
+
+
+def test_ragas_baseline_is_optional(tiny_eval):
+    samples, traces = tiny_eval
+    assert report_mod.build_report(samples, traces)["metrics"]["ragas_baseline"] is None
+
+
+def test_extract_ragas_block_from_previous_report(tmp_path):
+    """从上一份报告里取出 RAGAS 段，用作对照基线。"""
+    import json as _json
+
+    path = tmp_path / "prev.json"
+    path.write_text(
+        _json.dumps({"metrics": {"ragas": {"judge_model": "deepseek-chat",
+                                           "scores": {"faithfulness": 0.86}}}}),
+        encoding="utf-8",
+    )
+    block = report_mod.load_ragas_baseline(path)
+    assert block["judge_model"] == "deepseek-chat"
+    assert block["scores"]["faithfulness"] == 0.86
+
+
+def test_missing_previous_report_returns_none(tmp_path):
+    assert report_mod.load_ragas_baseline(tmp_path / "nope.json") is None

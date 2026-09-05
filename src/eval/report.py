@@ -84,6 +84,7 @@ def build_report(
     consistency_runs_hot: dict[str, list[AgentTrace]] | None = None,
     consistency_temperature: float | None = None,
     ragas: dict | None = None,
+    ragas_baseline: dict | None = None,
     notes: str = "",
 ) -> dict:
     """把轨迹汇总成一份完整报告（纯函数，可在 CI 里用构造轨迹验证）。"""
@@ -179,6 +180,7 @@ def build_report(
             "consistency": consistency,
             "consistency_hot": consistency_hot,
             "ragas": ragas,
+            "ragas_baseline": ragas_baseline,
         },
         "tokens": {
             "prompt": prompt_tokens,
@@ -188,6 +190,22 @@ def build_report(
         "anomalies": anomalies,
         "per_question": per_question,
     }
+
+
+def load_ragas_baseline(path: Path | str) -> dict | None:
+    """从上一份报告 JSON 里取出 RAGAS 段，用作换裁判前的对照基线。
+
+    只取 judge_model 与 scores：对照的意义在于"同一批轨迹换个裁判差多少"，
+    分母与排除清单由当前这次运行自己负责。
+    """
+    target = Path(path)
+    if not target.exists():
+        return None
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    block = (payload.get("metrics") or {}).get("ragas")
+    if not block:
+        return None
+    return {"judge_model": block.get("judge_model"), "scores": block.get("scores") or {}}
 
 
 def _fmt(value: float | None) -> str:
@@ -280,6 +298,29 @@ def render_markdown(report: dict) -> str:
             lines.append("被排除的样本：" + "、".join(
                 f"`{e['id']}`（{e.get('reason', '')}）" for e in excluded
             ))
+
+    base = m.get("ragas_baseline")
+    if rg and base and base.get("scores"):
+        lines += [
+            "",
+            "### 裁判敏感性对照",
+            "",
+            f"同一批轨迹，换裁判模型重判一次："
+            f"`{base.get('judge_model')}` → `{rg.get('judge_model')}`。"
+            "差值反映的是**评分标准本身有多依赖裁判模型**，与被测 Agent 无关。",
+            "",
+            "| 指标 | " + f"{base.get('judge_model')} | {rg.get('judge_model')} | 差值 |",
+            "|---|---|---|---|",
+        ]
+        for name, new_value in (rg.get("scores") or {}).items():
+            old_value = (base.get("scores") or {}).get(name)
+            if old_value is None:
+                lines.append(f"| {name} | — | {_fmt(new_value)} | — |")
+                continue
+            delta = new_value - old_value
+            lines.append(
+                f"| {name} | {_fmt(old_value)} | {_fmt(new_value)} | {delta:+.3f} |"
+            )
 
     anomalies = report.get("anomalies") or []
     if anomalies:
@@ -473,6 +514,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="复用已落盘的轨迹重算指标，不重跑 Agent（省钱；如只想补 RAGAS）",
     )
+    parser.add_argument(
+        "--compare-ragas",
+        type=str,
+        default=None,
+        help="上一份报告 JSON 的路径，用其 RAGAS 分数做换裁判前的对照基线",
+    )
     parser.add_argument("--notes", type=str, default="", help="写进报告的备注")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
@@ -533,6 +580,12 @@ def main(argv: list[str] | None = None) -> int:
         print("RAGAS：基于同一批轨迹算生成质量指标（裁判走 DeepSeek）", file=sys.stderr)
         ragas_result = ragas_runner.run_ragas(samples, traces)
 
+    ragas_baseline = load_ragas_baseline(args.compare_ragas) if args.compare_ragas else None
+    if ragas_baseline:
+        print(
+            f"裁判敏感性对照基线：{ragas_baseline['judge_model']}", file=sys.stderr
+        )
+
     report = build_report(
         samples,
         traces,
@@ -540,6 +593,7 @@ def main(argv: list[str] | None = None) -> int:
         consistency_runs_hot=consistency_runs_hot,
         consistency_temperature=args.consistency_temperature,
         ragas=ragas_result,
+        ragas_baseline=ragas_baseline,
         notes=args.notes,
     )
     paths = write_report(
