@@ -1,7 +1,7 @@
 # 评测报告
 
-- 时间（UTC）：2026-09-05T07:07:27+00:00
-- git commit：`101bbf6`
+- 时间（UTC）：2026-09-05T14:25:07+00:00
+- git commit：`d7de680`
 - 被测模型：`deepseek-chat`（temperature=0.0）
 - Embedding：`BAAI/bge-large-zh-v1.5`（查询指令前缀=True）
 - 检索 top-k：4；切分 500/80
@@ -24,12 +24,10 @@
 
 | 指标 | 值 | 实际打分行数 |
 |---|---|---|
-| faithfulness | 0.859 | 31/35  ⚠ |
-| answer_relevancy | 0.816 | 35/35 |
+| faithfulness | 0.862 | 35/35 |
+| answer_relevancy | 0.826 | 35/35 |
 | context_recall | 0.824 | 35/35 |
-| context_precision | 0.699 | 34/35  ⚠ |
-
-> ⚠ **有指标未在全部提交行上打出分**（裁判调用失败或超时，RAGAS 会把该行留空，而均值默认跳过空值）。带 ⚠ 的指标覆盖面小于分母，不能当作全量结果引用。
+| context_precision | 0.670 | 35/35 |
 
 被排除的样本：`cap_009`（本轮没有检索内容（如纯算术题），faithfulness / context_recall 无从谈起）
 
@@ -39,12 +37,10 @@
 
 | 指标 | deepseek-chat | deepseek-reasoner | 差值 | 打分行数 |
 |---|---|---|---|---|
-| faithfulness | 0.859 | 0.859 | **不可比** | 35/35 → 31/35 |
-| answer_relevancy | 0.842 | 0.816 | -0.027 | 35/35 → 35/35 |
+| faithfulness | 0.859 | 0.862 | +0.004 | 35/35 → 35/35 |
+| answer_relevancy | 0.842 | 0.826 | -0.016 | 35/35 → 35/35 |
 | context_recall | 0.905 | 0.824 | -0.081 | 35/35 → 35/35 |
-| context_precision | 0.662 | 0.699 | **不可比** | 35/35 → 34/35 |
-
-> ⚠ **faithfulness、context_precision 的差值不可比**：两次运行打分成功的行数不同，均值是在不同子集上算的。看着像「换裁判没影响」的 0.000 差值，很可能只是两个不同样本集碰巧接近。要得到可比的对照，必须两次都打满同样的行数。
+| context_precision | 0.662 | 0.670 | +0.007 | 35/35 → 35/35 |
 
 ## Token 消耗
 

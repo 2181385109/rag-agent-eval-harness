@@ -1,7 +1,7 @@
 {
   "meta": {
-    "timestamp_utc": "2026-09-05T07:07:27+00:00",
-    "git_commit": "101bbf6",
+    "timestamp_utc": "2026-09-05T14:25:07+00:00",
+    "git_commit": "d7de680",
     "model": "deepseek-chat",
     "embedding_model": "BAAI/bge-large-zh-v1.5",
     "use_query_instruction": true,
@@ -11,7 +11,7 @@
     "max_agent_steps": 6,
     "temperature": 0.0,
     "golden_set_size": 36,
-    "notes": "M5 前置：标注盲标重扫（判据见 data/annotation_criteria.md，逐题归因见 reports/annotation_rescan_2026-09-05.md）；RAGAS 换 deepseek-reasoner 重判同一批轨迹，与 deepseek-chat 并列对照。一致性未重跑（本轮复用轨迹，其数值见 eval_20260905T041922Z.json）"
+    "notes": "M5 前置定版：盲标重扫后的标注；RAGAS 换 deepseek-reasoner 重判同一批轨迹（超时 600s / 并发 2），与 deepseek-chat 并列对照。一致性未重跑，其数值见 eval_20260905T041922Z.json"
   },
   "metrics": {
     "recall_at_k": {
@@ -246,18 +246,18 @@
         "context_precision"
       ],
       "scores": {
-        "faithfulness": 0.8585639093161685,
-        "answer_relevancy": 0.8157405280291545,
+        "faithfulness": 0.8623977592369135,
+        "answer_relevancy": 0.82616615218848,
         "context_recall": 0.8238095238095238,
-        "context_precision": 0.6990411677572981
+        "context_precision": 0.6696688105188906
       },
       "scored_counts": {
-        "faithfulness": 31,
+        "faithfulness": 35,
         "answer_relevancy": 35,
         "context_recall": 35,
-        "context_precision": 34
+        "context_precision": 35
       },
-      "has_incomplete_metric": true,
+      "has_incomplete_metric": false,
       "n_submitted": 35,
       "n_excluded": 1,
       "total": 36,
