@@ -585,6 +585,241 @@ def write_report(
     return paths
 
 
+# ===========================================================================
+# 回归门禁（M6，CLAUDE.md §7）
+#
+# 两道闸，管的是两件不同的事：
+#
+#   闸 A「口径闸」：输入冻结（tests/fixtures 里的固定子集 + 固定轨迹），
+#       重算指标必须与基线**逐位相等**。输入没变、数字变了，只可能是
+#       指标代码的口径变了——不论变高变低都得拦。这是信贷项目里
+#       "同一批样本 PSI 必须复现"的同一思路。
+#
+#   闸 B「回归闸」：拿本次真实运行的报告与上一份快照比，
+#       关键指标跌超 config.METRIC_DROP_TOLERANCE 即 fail。
+#       真实运行有模型噪声，所以这道闸用容差而不是等值。
+#
+# 两道闸都**离线**：闸 A 读 fixture，闸 B 读已提交进 git 的报告 JSON，
+# 全程不碰 DeepSeek API（CI 上没有 key，也刻意不放）。
+# ===========================================================================
+
+GATE_FIXTURE_DIR = Path(__file__).resolve().parent.parent.parent / "tests" / "fixtures"
+GATE_SAMPLES_PATH = GATE_FIXTURE_DIR / "gate_samples.jsonl"
+GATE_TRACES_PATH = GATE_FIXTURE_DIR / "gate_traces.jsonl"
+GATE_BASELINE_FILENAME = "gate_baseline.json"
+
+# 闸 A 盯的指标：全部可离线重算的自定义指标。
+# RAGAS 类指标要调裁判，进不了闸 A，由闸 B 在报告层面看。
+GATE_EXACT_METRICS = (
+    "recall_at_k",
+    "recall_at_k_first_call",
+    "task_success_rate",
+    "tool_accuracy",
+    "tool_set_accuracy",
+)
+
+
+def load_gate_fixture(
+    samples_path: Path | str | None = None, traces_path: Path | str | None = None
+):
+    """读回冻结的门禁子集。刻意含已知失败样本——输入全是满分的门禁形同虚设。"""
+    from src.eval.datasets import GoldenSample
+
+    sp = Path(samples_path) if samples_path else GATE_SAMPLES_PATH
+    tp = Path(traces_path) if traces_path else GATE_TRACES_PATH
+    samples = [
+        GoldenSample.model_validate_json(line)
+        for line in sp.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    return samples, load_traces(tp)
+
+
+def compute_gate_metrics(samples, traces) -> dict:
+    """闸 A 的被测量：从冻结输入重算出的那几个指标。"""
+    rep = build_report(samples, traces)
+    return {
+        name: {
+            "value": rep["metrics"][name]["value"],
+            "n": rep["metrics"][name]["n"],
+            "total": rep["metrics"][name]["total"],
+        }
+        for name in GATE_EXACT_METRICS
+    }
+
+
+def write_gate_baseline(path: Path | None = None) -> Path:
+    """重算并写入闸 A 的基线。
+
+    **这不是日常操作**：输入是冻结的，基线变动只可能因为口径变了。
+    执行它等于宣布"我确实改了指标定义"，必须同时在报告/PR 里说明改了什么、为什么。
+    """
+    samples, traces = load_gate_fixture()
+    target = Path(path) if path else (config.REPORTS_DIR / GATE_BASELINE_FILENAME)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "meta": {
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "git_commit": _git_commit(),
+            "fixture_ids": [s.id for s in samples],
+            "note": "闸 A 基线：输入冻结，重算必须逐位相等。改动它=改了指标口径。",
+        },
+        "metrics": compute_gate_metrics(samples, traces),
+    }
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return target
+
+
+def load_gate_baseline(path: Path | None = None) -> dict:
+    target = Path(path) if path else (config.REPORTS_DIR / GATE_BASELINE_FILENAME)
+    if not target.exists():
+        raise FileNotFoundError(
+            f"闸 A 基线不存在：{target}。首次建立请跑 "
+            f"`python -m src.eval.report --write-gate-baseline`"
+        )
+    return json.loads(target.read_text(encoding="utf-8"))
+
+
+def check_exact_gate(baseline: dict | None = None) -> list[dict]:
+    """闸 A：冻结输入下重算，逐项与基线比对。返回 findings。"""
+    base = baseline if baseline is not None else load_gate_baseline()
+    samples, traces = load_gate_fixture()
+    current = compute_gate_metrics(samples, traces)
+
+    findings = []
+    for name in GATE_EXACT_METRICS:
+        want = (base.get("metrics") or {}).get(name)
+        got = current.get(name)
+        if want is None:
+            findings.append({"metric": name, "status": "missing_baseline", "current": got})
+            continue
+        same = (
+            want.get("value") == got.get("value")
+            and want.get("n") == got.get("n")
+            and want.get("total") == got.get("total")
+        )
+        findings.append(
+            {
+                "metric": name,
+                "status": "ok" if same else "changed",
+                "baseline": want,
+                "current": got,
+            }
+        )
+    return findings
+
+
+def _metric_value(report: Mapping, name: str):
+    """从报告里取一个指标值。faithfulness 这类在 RAGAS 段里，路径不同。"""
+    metrics = report.get("metrics") or {}
+    item = metrics.get(name)
+    if isinstance(item, Mapping) and "value" in item:
+        return item["value"]
+    ragas = metrics.get("ragas") or {}
+    scores = ragas.get("scores") or {}
+    return scores.get(name)
+
+
+def check_regression_gate(
+    current: Mapping,
+    baseline: Mapping,
+    tolerance: float | None = None,
+    metrics: Sequence[str] = config.GATED_METRICS,
+) -> list[dict]:
+    """闸 B：本次报告 vs 上一份快照，关键指标跌超容差即 dropped。
+
+    两份报告的黄金集规模不同就不比——那是在不同题目集上算的均值，
+    差值没有意义（同 §RAGAS 的分母陷阱）。如实标 incomparable，不硬凑。
+    """
+    tol = config.METRIC_DROP_TOLERANCE if tolerance is None else tolerance
+    cur_size = (current.get("meta") or {}).get("golden_set_size")
+    base_size = (baseline.get("meta") or {}).get("golden_set_size")
+    comparable = cur_size == base_size
+
+    findings = []
+    for name in metrics:
+        old = _metric_value(baseline, name)
+        new = _metric_value(current, name)
+        if old is None or new is None:
+            findings.append(
+                {"metric": name, "status": "missing", "baseline": old, "current": new}
+            )
+            continue
+        if not comparable:
+            findings.append(
+                {
+                    "metric": name,
+                    "status": "incomparable",
+                    "baseline": old,
+                    "current": new,
+                    "delta": new - old,
+                    "note": f"黄金集规模不同（{base_size} -> {cur_size}），均值不在同一批题上",
+                }
+            )
+            continue
+        delta = new - old
+        findings.append(
+            {
+                "metric": name,
+                "status": "dropped" if delta < -tol else "ok",
+                "baseline": old,
+                "current": new,
+                "delta": delta,
+            }
+        )
+    return findings
+
+
+def find_previous_snapshot(directory: Path | None = None, current: Path | None = None):
+    """找可作基线的上一份快照：按文件名时间戳排序后，最新的那个非 current。
+
+    文件名里的时间戳是零填充的定长格式，字典序即时间序。
+    """
+    target = Path(directory) if directory else config.REPORTS_DIR
+    cur = Path(current).name if current else None
+    snapshots = sorted(p for p in target.glob("eval_*.json") if p.name != cur)
+    return snapshots[-1] if snapshots else None
+
+
+def run_gates() -> int:
+    """跑两道闸并打印结论。返回值即进程退出码：有 changed / dropped 就非 0。"""
+    failed = False
+
+    print("闸 A（口径闸）：冻结输入重算，必须与基线逐位相等")
+    for f in check_exact_gate():
+        if f["status"] == "ok":
+            print(f"  ok        {f['metric']} = {f['current']['value']}")
+        else:
+            failed = True
+            print(f"  {f['status'].upper():9} {f['metric']}: 基线 {f.get('baseline')} -> 现在 {f['current']}")
+
+    latest = config.REPORTS_DIR / "latest.json"
+    print()
+    if not latest.exists():
+        print("闸 B（回归闸）：跳过——还没有 latest.json")
+        return 1 if failed else 0
+
+    current_report = json.loads(latest.read_text(encoding="utf-8"))
+    prev_name = snapshot_filename(current_report["meta"]["timestamp_utc"])
+    previous = find_previous_snapshot(current=config.REPORTS_DIR / prev_name)
+    if previous is None:
+        print("闸 B（回归闸）：跳过——除本次外没有可比的历史快照")
+        return 1 if failed else 0
+
+    baseline_report = json.loads(previous.read_text(encoding="utf-8"))
+    print(f"闸 B（回归闸）：latest.json vs {previous.name}，容差 {config.METRIC_DROP_TOLERANCE}")
+    for f in check_regression_gate(current_report, baseline_report):
+        if f["status"] == "dropped":
+            failed = True
+        delta = f.get("delta")
+        shown = f"{delta:+.4f}" if isinstance(delta, float) else "—"
+        print(f"  {f['status']:12} {f['metric']}: {f.get('baseline')} -> {f.get('current')}  ({shown})")
+
+    print()
+    print("门禁结果：" + ("FAIL" if failed else "PASS"))
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -629,8 +864,25 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="从上一份报告 JSON 原样取回 RAGAS 段（同一批轨迹下省 40 分钟；报告里会标注复用）",
     )
+    parser.add_argument(
+        "--gate", action="store_true", help="只跑回归门禁（离线，不调 API），不重跑评测"
+    )
+    parser.add_argument(
+        "--write-gate-baseline",
+        action="store_true",
+        help="重写闸 A 基线。仅在**有意变更指标口径**时执行，并须在 PR/报告里说明",
+    )
     parser.add_argument("--notes", type=str, default="", help="写进报告的备注")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+
+    if args.write_gate_baseline:
+        path = write_gate_baseline()
+        print(f"闸 A 基线已重写：{path}")
+        print("注意：输入是冻结的，基线变动只可能因为指标口径变了——请在提交信息里写明改了什么。")
+        return 0
+
+    if args.gate:
+        return run_gates()
 
     from src.agent import graph
 

@@ -26,5 +26,12 @@ jobs:
         # 省钱 + 结果确定（CLAUDE.md §7）。live 标记的测试整体排除。
         run: pytest -m "not live"
 
-      # TODO(M6): 指标回归门禁——跑固定小子集（LLM 打桩/读缓存响应），
-      # 与 reports/ 里的基线比对，关键指标跌破 config.METRIC_DROP_TOLERANCE 即 fail。
+      - name: Metric regression gate
+        # 两道闸，都离线（CLAUDE.md §7）：
+        #   闸 A 口径闸——tests/fixtures 里的冻结子集重算指标，与 reports/gate_baseline.json
+        #        逐位比对。输入没变数字却变了，只可能是指标口径被改动，涨跌都拦。
+        #   闸 B 回归闸——reports/latest.json 与上一份快照比，关键指标
+        #        （task_success_rate / tool_accuracy / faithfulness）跌超
+        #        config.METRIC_DROP_TOLERANCE 即 fail。
+        # 与信贷风控项目里 PSI 触发告警是同一思路，搬到 Agent 评测上。
+        run: python -m src.eval.report --gate
