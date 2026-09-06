@@ -129,6 +129,49 @@ v2 判据把「要点」定死成"参考答案里的每一项具体限定"，并
 
 ---
 
+## 三点五、公开上架前的安全排查与脱敏决定（2026-09-06）
+
+### 排查结果
+
+- 全仓 + 全部历史提交扫 `sk-[a-zA-Z0-9]{20,}`：**零命中**。真实 key 只存在于未跟踪的
+  `.env`，且 `git log --all --full-history -- .env` 为空——**从未进入过任何一次提交**。
+- 已跟踪文件逐一比对 `.gitignore`：零文件命中忽略规则，无需 `git rm --cached`。
+- 邮箱 / 手机号 / 身份证：零命中（此前"疑似手机号"实为指标小数，如 `0.7741935483870968`）。
+
+### 已脱敏（commit `87fdada`）
+
+本机路径统一替换为占位符：
+
+| 原文 | 替换为 |
+|---|---|
+| `D:\xiangmu\credit-risk-mlops` | `<project-root>（credit-risk-mlops）` |
+| `D:\xiangmu\flight-delay-scheduling` | `<project-root>（flight-delay-scheduling）` |
+| 裸 `D:\xiangmu` | `<workspace-root>` |
+
+覆盖：`corpus/` 两份规格书（**源头**，今后重建索引 / 重跑 Agent 都不会再带出该路径）、
+`reports/human_labeling_sheet*.md`、`data/human_labels.jsonl` 的 answer 字段、
+以及两份报告 JSON 里 `backfill.source` 的绝对路径（改为相对路径）。
+
+### 刻意保留未脱敏的 5 处 —— 这是决定，不是遗漏
+
+`reports/eval_20260905T041922Z.json`、`eval_20260905T142507Z.json`、
+`eval_20260906T033855Z.json`、`latest.json`、`tests/fixtures/gate_traces.jsonl`
+里仍有 `D:\xiangmu\credit-risk-mlops` 字符串。它来自 **cap_035 的一次真实 DeepSeek 调用**
+——模型在答案里逐字引用了语料原文。保留的三条理由：
+
+1. **良性、非密钥。** 它是一个本机开发路径，且 `credit-risk-mlops` 这个仓库名本就公开，
+   公开的边际风险≈0。
+2. **`gate_traces.jsonl` 与 `gate_judge_scores.jsonl` 的 `answer_sha1` 是一对冻结锚点，
+   价值就在冻结。** 那套指纹是专为防止"裁判分套错轨迹"而加的。为一个无害字符串去改
+   fixture 文本、再回改指纹让它重新对上，**形状上等同于"朝着想要的结果调指纹"**——
+   正是本项目通篇在证明自己不做的事（见 §6 那条"血的教训"）。红线不破。
+3. 若强行脱敏而不同步改指纹，闸 A 会因指纹失配丢弃该条裁判分、改变
+   `task_success_rate` 的分母，`--gate` 相对已提交基线直接 FAIL。
+
+**给后来者**：看到公开仓库里这 5 处路径，不必"顺手修掉"。要动它，先读懂上面第 2 条。
+
+---
+
 ## 四、接手常用命令
 
 ```bash
