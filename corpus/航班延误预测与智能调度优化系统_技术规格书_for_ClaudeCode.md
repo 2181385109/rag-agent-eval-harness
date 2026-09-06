@@ -1,13 +1,13 @@
 # 航班延误预测与智能调度优化系统 · 技术规格书
 
-> **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终把项目落地到本地路径 **`D:\xiangmu`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、作品集级别的项目。
+> **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终把项目落地到本地路径 **`<workspace-root>`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、作品集级别的项目。
 
 ---
 
 ## 0. 给 Claude Code 的执行说明（先读这一节）
 
 - **语言**：全程使用 **Python**（3.11）。所有文件路径在代码中一律用 `pathlib.Path` 处理，保证在 **Windows** 上正常工作。
-- **落地路径**：项目最终根目录为 **`D:\xiangmu\flight-delay-scheduling`**。若 `D:\xiangmu` 不存在则创建；所有代码、配置、产物都放在该目录下。
+- **落地路径**：项目最终根目录为 **`<project-root>（flight-delay-scheduling）`**。若 `<workspace-root>` 不存在则创建；所有代码、配置、产物都放在该目录下。
 - **发布 GitHub**：全部开发与自测完成后，按第 18 节把项目推送到用户 GitHub。
 - **自主度**：可自主做合理工程决策，不必逐字征询确认；文档未指定处选成熟简洁的默认方案，并在 README 记录取舍。
 - **构建顺序**：严格按第 17 节里程碑（M1→M7）推进；**每完成一个里程碑先跑通对应测试再继续**。任何时候项目都应处于"能跑通全流程"的状态。
@@ -86,7 +86,7 @@
 
 ## 4. 项目结构
 
-**根目录：`D:\xiangmu\flight-delay-scheduling`**
+**根目录：`<project-root>（flight-delay-scheduling）`**
 
 ```
 flight-delay-scheduling/
@@ -133,7 +133,7 @@ flight-delay-scheduling/
 - **Python**：3.11
 - **虚拟环境**（在项目根目录）：
   ```powershell
-  cd D:\xiangmu\flight-delay-scheduling
+  cd <project-root>（flight-delay-scheduling）
   python -m venv .venv
   .\.venv\Scripts\Activate.ps1        # PowerShell（cmd 用 .venv\Scripts\activate.bat）
   pip install -e .                     # 安装本项目及依赖
@@ -363,14 +363,14 @@ python -m flightopt run-all       # 一键全流程
 | **M4 分级** | 分位数 5 级 + 捕获率 | 高风险 Recall ≥0.80 且优于规则，`test_risk` 绿 |
 | **M5 调度** | CP-SAT + 贪心基线 + 对照 | 硬约束满足率 ≥0.85，延误降 ≥1min/架次，`test_schedule` 绿 |
 | **M6 评估+界面** | 指标报告 + 静态图 + 甘特动画 + Streamlit + README | `run-all` 一键跑通，`pytest` 全绿，README 指标表填充，面板可启动 |
-| **M7 落地+发布** | 放到 `D:\xiangmu`，推送 GitHub | 项目位于 `D:\xiangmu\flight-delay-scheduling`，GitHub 仓库可访问、README 正常渲染、CI 通过 |
+| **M7 落地+发布** | 放到 `<workspace-root>`，推送 GitHub | 项目位于 `<project-root>（flight-delay-scheduling）`，GitHub 仓库可访问、README 正常渲染、CI 通过 |
 
 ---
 
 ## 18. 落地路径与 GitHub 发布（M7）
 
 ### 18.1 落地到本地路径
-- 确认/创建目录 `D:\xiangmu`，项目根目录为 `D:\xiangmu\flight-delay-scheduling`。
+- 确认/创建目录 `<workspace-root>`，项目根目录为 `<project-root>（flight-delay-scheduling）`。
 - 全部代码、配置、`README.md`、测试、`outputs/reports` 等置于此目录下。
 
 ### 18.2 `.gitignore`（提交前必须就位）
@@ -391,7 +391,7 @@ outputs/models/   outputs/figures/*.mp4
 
 ### 18.4 发布步骤（在项目根目录执行）
 ```powershell
-cd D:\xiangmu\flight-delay-scheduling
+cd <project-root>（flight-delay-scheduling）
 git init
 git add .
 git commit -m "Initial commit: flight delay prediction & scheduling optimization"
@@ -414,7 +414,7 @@ gh repo create flight-delay-scheduling --public --source . --remote origin --pus
 
 ## 19. 交付物清单
 
-- [ ] 纯 Python 代码库（第 4 节结构），位于 `D:\xiangmu\flight-delay-scheduling`
+- [ ] 纯 Python 代码库（第 4 节结构），位于 `<project-root>（flight-delay-scheduling）`
 - [ ] `python -m flightopt run-all` 一键跑通全流程
 - [ ] 合成数据生成器（+ 可选公开数据加载器）
 - [ ] LightGBM 预测模型（+ RF/规则基线对照）+ SHAP 解释

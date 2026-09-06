@@ -1,13 +1,13 @@
 # 信贷违约风控 · 端到端机器学习系统（建模 + MLOps）· 技术规格书
 
-> **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终落地到本地路径 **`D:\xiangmu\credit-risk-mlops`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、**面试拿得出手**的作品：一个信贷违约风控模型，外加**从建模到上线的完整 MLOps 链路**。
+> **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终落地到本地路径 **`<project-root>（credit-risk-mlops）`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、**面试拿得出手**的作品：一个信贷违约风控模型，外加**从建模到上线的完整 MLOps 链路**。
 
 ---
 
 ## 0. 给 Claude Code 的执行说明（先读这一节）
 
 - **语言**：全程 **Python 3.11**。所有路径用 `pathlib.Path`，保证在 **Windows** 正常工作。
-- **落地路径**：项目根目录 **`D:\xiangmu\credit-risk-mlops`**。`D:\xiangmu` 不存在则创建。
+- **落地路径**：项目根目录 **`<project-root>（credit-risk-mlops）`**。`<workspace-root>` 不存在则创建。
 - **硬件**：本项目主模型是**树模型（LightGBM），纯 CPU 即可**，不依赖 GPU，不吃显存，天然稳。
 - **核心定位**：项目的星光在 **MLOps 工程链路**（训练流水线 → 实验追踪 → 服务化 → 容器化 → CI/CD → 漂移监控），建模层**刻意保持简洁**，别在调模型上耗时间。
 - **范围纪律（重要）**：**只做本文档列出的核心 MLOps 组件，不要额外堆工具**（不引入 K8s、Airflow、云服务等）。宁可少而精、每件都跑通，也不要多而散。
@@ -91,7 +91,7 @@ Give Me Some Credit 数据 (cs-training.csv)
 
 ## 4. 项目结构
 
-**根目录：`D:\xiangmu\credit-risk-mlops`**
+**根目录：`<project-root>（credit-risk-mlops）`**
 
 ```
 credit-risk-mlops/
@@ -140,7 +140,7 @@ credit-risk-mlops/
 - **Python**：3.11
 - **虚拟环境**（项目根目录）：
   ```powershell
-  cd D:\xiangmu\credit-risk-mlops
+  cd <project-root>（credit-risk-mlops）
   python -m venv .venv
   .\.venv\Scripts\Activate.ps1
   pip install -e .
@@ -310,14 +310,14 @@ python -m creditrisk run-all        # 一键：get-data→prep→train→evaluat
 | **M4 评估** | AUC/KS/PR-AUC/校准 + 评分卡 | 指标报告生成，`test_evaluate` 绿，README 表填充 |
 | **M5 服务+容器** | FastAPI + Docker | `/predict` 可用，`docker build/run` 通过，`test_api` 绿 |
 | **M6 监控+面板** | PSI 漂移 + Streamlit + README | `monitor` 能检出漂移，面板三页可用，`pytest` 全绿 |
-| **M7 落地+发布** | 放到 `D:\xiangmu`，推送 GitHub + CI 通过 | 仓库可访问、README 正常渲染、Actions 通过 |
+| **M7 落地+发布** | 放到 `<workspace-root>`，推送 GitHub + CI 通过 | 仓库可访问、README 正常渲染、Actions 通过 |
 
 ---
 
 ## 19. 落地路径与 GitHub 发布（M7）
 
 ### 19.1 落地
-项目根目录 `D:\xiangmu\credit-risk-mlops`，全部代码/配置/README/测试/`outputs/reports` 置于此。
+项目根目录 `<project-root>（credit-risk-mlops）`，全部代码/配置/README/测试/`outputs/reports` 置于此。
 
 ### 19.2 `.gitignore`（提交前必须就位）
 ```
@@ -335,7 +335,7 @@ outputs/figures/*.html
 
 ### 19.4 发布步骤
 ```powershell
-cd D:\xiangmu\credit-risk-mlops
+cd <project-root>（credit-risk-mlops）
 git init
 git add .
 git commit -m "Initial commit: credit-risk model with end-to-end MLOps"
@@ -349,7 +349,7 @@ gh repo create credit-risk-mlops --public --source . --remote origin --push
 
 ## 20. 交付物清单
 
-- [ ] 纯 Python 代码库（第 4 节结构），位于 `D:\xiangmu\credit-risk-mlops`
+- [ ] 纯 Python 代码库（第 4 节结构），位于 `<project-root>（credit-risk-mlops）`
 - [ ] `python -m creditrisk run-all` 一键跑通 数据→训练→评估
 - [ ] LightGBM 风控模型（+ 逻辑回归/常数基线）+ 不平衡处理 + SHAP + 评分卡
 - [ ] MLflow 实验追踪 + 模型注册

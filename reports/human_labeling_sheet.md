@@ -419,7 +419,7 @@
 > - **服务化**：FastAPI + Pydantic 校验 + Uvicorn
 > - **容器化**：Docker（+ 可选的 docker-compose，用于同时拉起 API 与 MLflow UI）
 >
-> 规格书第 10 节「容器化规格」只要求 `Dockerfile` 能通过 `docker build`，并可选提供 `docker-compose.yml`，全程未提及 Kubernetes 或任何编排集群方案。整个 MLOps 链路是本地落地（`D:\xiangmu\credit-risk-mlops`），采用轻量、本地可复现的技术栈，并未引入 K8s。
+> 规格书第 10 节「容器化规格」只要求 `Dockerfile` 能通过 `docker build`，并可选提供 `docker-compose.yml`，全程未提及 Kubernetes 或任何编排集群方案。整个 MLOps 链路是本地落地（`<project-root>（credit-risk-mlops）`），采用轻量、本地可复现的技术栈，并未引入 K8s。
 
 <details><summary>检索到的片段（8 块）</summary>
 

@@ -71,7 +71,7 @@
 >
 > ## 4. 项目结构
 >
-> **根目录：`D:\xiangmu\credit-risk-mlops`**
+> **根目录：`<project-root>（credit-risk-mlops）`**
 
 **`c730fa5c_0035`**  ·  信贷风控端到端ML系统_技术规格书_for_ClaudeCode.md
 
@@ -80,7 +80,7 @@
 > ## 19. 落地路径与 GitHub 发布（M7）
 >
 > ### 19.1 落地
-> 项目根目录 `D:\xiangmu\credit-risk-mlops`，全部代码/配置/README/测试/`outputs/reports` 置于此。
+> 项目根目录 `<project-root>（credit-risk-mlops）`，全部代码/配置/README/测试/`outputs/reports` 置于此。
 >
 > ### 19.2 `.gitignore`（提交前必须就位）
 > ```
@@ -98,7 +98,7 @@
 >
 > ## 20. 交付物清单
 >
-> - [ ] 纯 Python 代码库（第 4 节结构），位于 `D:\xiangmu\credit-risk-mlops`
+> - [ ] 纯 Python 代码库（第 4 节结构），位于 `<project-root>（credit-risk-mlops）`
 > - [ ] `python -m creditrisk run-all` 一键跑通 数据→训练→评估
 > - [ ] LightGBM 风控模型（+ 逻辑回归/常数基线）+ 不平衡处理 + SHAP + 评分卡
 > - [ ] MLflow 实验追踪 + 模型注册
@@ -184,7 +184,7 @@
 
 > # 航班延误预测与智能调度优化系统 · 技术规格书
 >
-> > **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终把项目落地到本地路径 **`D:\xiangmu`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、作品集级别的项目。
+> > **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终把项目落地到本地路径 **`<workspace-root>`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、作品集级别的项目。
 >
 > ---
 >
@@ -523,7 +523,7 @@
 
 > # 信贷违约风控 · 端到端机器学习系统（建模 + MLOps）· 技术规格书
 >
-> > **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终落地到本地路径 **`D:\xiangmu\credit-risk-mlops`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、**面试拿得出手**的作品：一个信贷违约风控模型，外加**从建模到上线的完整 MLOps 链路**。
+> > **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终落地到本地路径 **`<project-root>（credit-risk-mlops）`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、**面试拿得出手**的作品：一个信贷违约风控模型，外加**从建模到上线的完整 MLOps 链路**。
 >
 > ---
 >
@@ -548,7 +548,7 @@
 >
 > ## 4. 项目结构
 >
-> **根目录：`D:\xiangmu\credit-risk-mlops`**
+> **根目录：`<project-root>（credit-risk-mlops）`**
 
 **`c730fa5c_0005`**  ·  信贷风控端到端ML系统_技术规格书_for_ClaudeCode.md
 
@@ -753,7 +753,7 @@
 > ## 19. 落地路径与 GitHub 发布（M7）
 >
 > ### 19.1 落地
-> 项目根目录 `D:\xiangmu\credit-risk-mlops`，全部代码/配置/README/测试/`outputs/reports` 置于此。
+> 项目根目录 `<project-root>（credit-risk-mlops）`，全部代码/配置/README/测试/`outputs/reports` 置于此。
 >
 > ### 19.2 `.gitignore`（提交前必须就位）
 > ```
@@ -771,7 +771,7 @@
 >
 > ## 20. 交付物清单
 >
-> - [ ] 纯 Python 代码库（第 4 节结构），位于 `D:\xiangmu\credit-risk-mlops`
+> - [ ] 纯 Python 代码库（第 4 节结构），位于 `<project-root>（credit-risk-mlops）`
 > - [ ] `python -m creditrisk run-all` 一键跑通 数据→训练→评估
 > - [ ] LightGBM 风控模型（+ 逻辑回归/常数基线）+ 不平衡处理 + SHAP + 评分卡
 > - [ ] MLflow 实验追踪 + 模型注册
@@ -1091,7 +1091,7 @@
 >
 > ### 19.4 发布步骤
 > ```powershell
-> cd D:\xiangmu\credit-risk-mlops
+> cd <project-root>（credit-risk-mlops）
 > git init
 > git add .
 > git commit -m "Initial commit: credit-risk model with end-to-end MLOps"
@@ -1124,7 +1124,7 @@
 > ## 19. 落地路径与 GitHub 发布（M7）
 >
 > ### 19.1 落地
-> 项目根目录 `D:\xiangmu\credit-risk-mlops`，全部代码/配置/README/测试/`outputs/reports` 置于此。
+> 项目根目录 `<project-root>（credit-risk-mlops）`，全部代码/配置/README/测试/`outputs/reports` 置于此。
 >
 > ### 19.2 `.gitignore`（提交前必须就位）
 > ```
@@ -1146,7 +1146,7 @@
 >
 > ### 18.4 发布步骤（在项目根目录执行）
 > ```powershell
-> cd D:\xiangmu\flight-delay-scheduling
+> cd <project-root>（flight-delay-scheduling）
 > git init
 > git add .
 > git commit -m "Initial commit: flight delay prediction & scheduling optimization"
@@ -1366,7 +1366,7 @@
 > - **服务化**：FastAPI + Pydantic 校验 + Uvicorn
 > - **容器化**：Docker（+ 可选的 docker-compose，用于同时拉起 API 与 MLflow UI）
 >
-> 规格书第 10 节「容器化规格」只要求 `Dockerfile` 能通过 `docker build`，并可选提供 `docker-compose.yml`，全程未提及 Kubernetes 或任何编排集群方案。整个 MLOps 链路是本地落地（`D:\xiangmu\credit-risk-mlops`），采用轻量、本地可复现的技术栈，并未引入 K8s。
+> 规格书第 10 节「容器化规格」只要求 `Dockerfile` 能通过 `docker build`，并可选提供 `docker-compose.yml`，全程未提及 Kubernetes 或任何编排集群方案。整个 MLOps 链路是本地落地（`<project-root>（credit-risk-mlops）`），采用轻量、本地可复现的技术栈，并未引入 K8s。
 
 <details><summary>检索到的片段（8 块）</summary>
 
@@ -1386,7 +1386,7 @@
 
 > # 信贷违约风控 · 端到端机器学习系统（建模 + MLOps）· 技术规格书
 >
-> > **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终落地到本地路径 **`D:\xiangmu\credit-risk-mlops`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、**面试拿得出手**的作品：一个信贷违约风控模型，外加**从建模到上线的完整 MLOps 链路**。
+> > **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终落地到本地路径 **`<project-root>（credit-risk-mlops）`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、**面试拿得出手**的作品：一个信贷违约风控模型，外加**从建模到上线的完整 MLOps 链路**。
 >
 > ---
 >
@@ -1398,7 +1398,7 @@
 >
 > ## 4. 项目结构
 >
-> **根目录：`D:\xiangmu\credit-risk-mlops`**
+> **根目录：`<project-root>（credit-risk-mlops）`**
 
 **`c730fa5c_0023`**  ·  信贷风控端到端ML系统_技术规格书_for_ClaudeCode.md
 
@@ -1426,7 +1426,7 @@
 
 > # 航班延误预测与智能调度优化系统 · 技术规格书
 >
-> > **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终把项目落地到本地路径 **`D:\xiangmu`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、作品集级别的项目。
+> > **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终把项目落地到本地路径 **`<workspace-root>`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、作品集级别的项目。
 >
 > ---
 >
@@ -1512,7 +1512,7 @@
 
 > # 航班延误预测与智能调度优化系统 · 技术规格书
 >
-> > **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终把项目落地到本地路径 **`D:\xiangmu`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、作品集级别的项目。
+> > **本文档面向 Claude Code。** 请把它当作一份完整的项目实施规格（PRD + 技术设计），用 **Python** 自主完成端到端开发，最终把项目落地到本地路径 **`<workspace-root>`**，并**发布到用户的 GitHub**。目标是交付一个可运行、可测试、可复现、作品集级别的项目。
 >
 > ---
 >
@@ -1594,7 +1594,7 @@
 >
 > ## 19. 交付物清单
 >
-> - [ ] 纯 Python 代码库（第 4 节结构），位于 `D:\xiangmu\flight-delay-scheduling`
+> - [ ] 纯 Python 代码库（第 4 节结构），位于 `<project-root>（flight-delay-scheduling）`
 > - [ ] `python -m flightopt run-all` 一键跑通全流程
 > - [ ] 合成数据生成器（+ 可选公开数据加载器）
 > - [ ] LightGBM 预测模型（+ RF/规则基线对照）+ SHAP 解释

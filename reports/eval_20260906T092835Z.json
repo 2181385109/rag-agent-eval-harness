@@ -191,7 +191,7 @@
         }
       },
       "backfill": {
-        "source": "D:\\xiangmu\\rag-agent-eval-harness\\reports\\judge_scores.jsonl",
+        "source": "reports\\judge_scores.jsonl",
         "judge_model": "deepseek-reasoner",
         "rubric_version": "v2-要点级",
         "open_threshold": 2,
