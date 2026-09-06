@@ -1,0 +1,5 @@
+{"id": "cap_007", "judge_score": 1, "reason": "信贷部分缺70/15/15；航班部分遗漏时间序切分和tail_id GroupKFold，要点不完整。", "retried": false, "failure_tag": null, "judge_model": "deepseek-reasoner", "answer_sha1": "1a513e9dca03"}
+{"id": "cap_010", "judge_score": 2, "reason": "明确回答没有指定Redis，依据与参考答案一致，指出检索到的Redis来自其他项目，未编造。", "retried": false, "failure_tag": "hallucination_bait", "judge_model": "deepseek-reasoner", "answer_sha1": "6012714d2fc8"}
+{"id": "cap_026", "judge_score": 2, "reason": "四条硬约束与时隙容量、周转、时窗、宵禁完全一致，无遗漏无编造。", "retried": false, "failure_tag": null, "judge_model": "deepseek-reasoner", "answer_sha1": "d72ed8295cd1"}
+{"id": "cap_035", "judge_score": 2, "reason": "Agent答案与参考答案一致，明确说不要求K8s，并准确说明容器化只用Docker和可选docker-compose。", "retried": false, "failure_tag": null, "judge_model": "deepseek-reasoner", "answer_sha1": "09d9207ee6ba"}
+{"id": "cap_036", "judge_score": 2, "reason": "结论与参考答案一致，明确说明未指定Kafka，且未编造内容，要点齐全。", "retried": false, "failure_tag": "hallucination_bait", "judge_model": "deepseek-reasoner", "answer_sha1": "89d0ab7cca2b"}

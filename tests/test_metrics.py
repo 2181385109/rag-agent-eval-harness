@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from src import config
 from src.agent.trace import AgentTrace, RetrievedChunk, ToolCall, ToolResult, TraceStep
 from src.eval import metrics
 from src.eval.datasets import GoldenSample
@@ -177,12 +178,13 @@ def test_closed_success_needs_all_keys():
 
 
 def test_open_question_is_not_rule_judged():
-    """开放题在 M3 无法自动判定，返回 None 而不是硬判对错。"""
+    """开放题规则判不了，返回 None 而不是硬判对错。"""
     s = make_sample(answer_type="open", answer_keys=[])
     assert metrics.judge_closed(s, "任意回答") is None
 
 
-def test_task_success_aggregate_excludes_open():
+def test_task_success_aggregate_excludes_open_without_judge_scores():
+    """不给裁判分时，开放题计入 total 但不计入 n——M3~M4 期间就是这个行为。"""
     samples = [
         make_sample(id="a", answer_keys=["0.25"]),
         make_sample(id="b", answer_keys=["96"]),
@@ -196,6 +198,96 @@ def test_task_success_aggregate_excludes_open():
     r = metrics.task_success_rate(samples, traces)
     assert r.value == 0.5
     assert r.n == 2 and r.total == 3
+    assert r.meta["unjudged"] == ["c"]
+
+
+# ------------------------------------------------- 开放题回填（裁判分）
+def test_open_success_needs_full_marks():
+    """满分 2 才算成功；1 分「方向对但要点有遗漏」不算。"""
+    s = make_sample(answer_type="open", answer_keys=[])
+    assert metrics.judge_open(s, 2) is True
+    assert metrics.judge_open(s, 1) is False
+    assert metrics.judge_open(s, 0) is False
+
+
+def test_open_success_threshold_is_configurable_not_hardcoded():
+    """门槛来自 config，不是散落在代码里的字面量——改口径只有一个地方要动。"""
+    s = make_sample(answer_type="open", answer_keys=[])
+    assert metrics.judge_open(s, 2) is metrics.judge_open(
+        s, 2, config.OPEN_SUCCESS_THRESHOLD
+    )
+    assert metrics.judge_open(s, 1, threshold=1) is True
+
+
+def test_missing_judge_score_is_not_a_failure():
+    """没判过 ≠ 判错。计成 0 就是凭空拉低成功率。"""
+    s = make_sample(answer_type="open", answer_keys=[])
+    assert metrics.judge_open(s, None) is None
+
+
+def test_judge_score_never_overrides_closed_rule():
+    """闭合题归 answer_keys 管，裁判分不许插手——否则规则判定就形同虚设。"""
+    s = make_sample(id="a", answer_keys=["0.25"])
+    traces = {"a": make_trace(answer="完全没提到那个数")}
+    r = metrics.task_success_rate([s], traces, judge_scores={"a": 2})
+    assert r.value == 0.0
+    assert r.meta["source"]["a"] == "rule"
+
+
+def test_task_success_backfills_open_with_judge_scores():
+    """回填后分母是全集：闭合题走规则，开放题走裁判。"""
+    samples = [
+        make_sample(id="a", answer_keys=["0.25"]),
+        make_sample(id="b", answer_type="open", answer_keys=[]),
+        make_sample(id="c", answer_type="open", answer_keys=[]),
+    ]
+    traces = {
+        "a": make_trace(answer="阈值 0.25"),
+        "b": make_trace(answer="要点齐全的开放回答"),
+        "c": make_trace(answer="方向对但漏了要点"),
+    }
+    r = metrics.task_success_rate(samples, traces, judge_scores={"b": 2, "c": 1})
+    assert r.n == 3 and r.total == 3
+    assert r.value == pytest.approx(2 / 3)
+    assert r.detail == {"a": True, "b": True, "c": False}
+    assert r.meta["n_rule_judged"] == 1 and r.meta["n_judge_judged"] == 2
+    assert r.meta["unjudged"] == []
+
+
+def test_partially_backfilled_reports_honest_denominator():
+    """只回填了一部分开放题时，分母只涨到实际判过的题数，不许拿全集充数。"""
+    samples = [
+        make_sample(id="a", answer_keys=["0.25"]),
+        make_sample(id="b", answer_type="open", answer_keys=[]),
+        make_sample(id="c", answer_type="open", answer_keys=[]),
+    ]
+    traces = {
+        "a": make_trace(answer="阈值 0.25"),
+        "b": make_trace(answer="开放回答"),
+        "c": make_trace(answer="开放回答"),
+    }
+    r = metrics.task_success_rate(samples, traces, judge_scores={"b": 2})
+    assert r.n == 2 and r.total == 3
+    assert r.meta["unjudged"] == ["c"]
+
+
+def test_success_meta_records_the_rule():
+    """口径要写在指标自己身上：混合判据的均值，光有个数字没法回溯。"""
+    samples = [make_sample(id="a", answer_type="open", answer_keys=[])]
+    traces = {"a": make_trace(answer="开放回答")}
+    r = metrics.task_success_rate(samples, traces, judge_scores={"a": 2})
+    assert r.meta["open_threshold"] == config.OPEN_SUCCESS_THRESHOLD
+    assert "answer_keys" in r.meta["rule"] and "judge_score" in r.meta["rule"]
+    assert r.as_dict()["meta"]["source"] == {"a": "judge"}
+
+
+def test_consistency_ignores_judge_scores_for_open_questions():
+    """多轮一致性刻意不回填：裁判分是给主评测那一次答案打的，K 次答案各不相同。"""
+    s = make_sample(id="q1", answer_type="open", answer_keys=[])
+    runs = [make_trace(answer=a) for a in ["答案甲", "答案乙"]]
+    r = metrics.consistency([s], {"q1": runs})
+    assert r.detail["q1"]["success_agreement"] is None
+    assert r.success_agreement is None
 
 
 # ============================================================== 多轮一致性

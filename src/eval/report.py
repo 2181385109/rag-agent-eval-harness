@@ -86,12 +86,19 @@ def build_report(
     ragas: dict | None = None,
     ragas_baseline: dict | None = None,
     agreement: dict | None = None,
+    judge_scores: Mapping[str, int] | None = None,
+    judge_backfill: dict | None = None,
     notes: str = "",
 ) -> dict:
-    """把轨迹汇总成一份完整报告（纯函数，可在 CI 里用构造轨迹验证）。"""
+    """把轨迹汇总成一份完整报告（纯函数，可在 CI 里用构造轨迹验证）。
+
+    judge_scores 给了就用来回填开放题的任务成功率；judge_backfill 是它的溯源信息
+    （来自哪个文件、哪个裁判模型、哪些行验过指纹），随指标一起落盘——
+    一个由两种判据拼出来的均值，不带溯源就没法复现。
+    """
     recall = metrics.aggregate_recall(samples, traces)
     recall_first = metrics.aggregate_recall(samples, traces, first_call_only=True)
-    success = metrics.task_success_rate(samples, traces)
+    success = metrics.task_success_rate(samples, traces, judge_scores=judge_scores)
     tool = metrics.tool_accuracy(samples, traces)
     tool_set = metrics.tool_set_accuracy(samples, traces)
 
@@ -126,6 +133,7 @@ def build_report(
                 "recall_at_k": recall.detail.get(s.id),
                 "recall_at_k_first_call": recall_first.detail.get(s.id),
                 "success": success.detail.get(s.id),
+                "success_source": success.meta.get("source", {}).get(s.id),
                 "stop_reason": t.stop_reason if t else None,
                 "answer": t.answer if t else None,
             }
@@ -157,6 +165,10 @@ def build_report(
                 }
             )
 
+    success_block = success.as_dict()
+    if judge_backfill:
+        success_block["backfill"] = judge_backfill
+
     return {
         "meta": {
             "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -175,7 +187,7 @@ def build_report(
         "metrics": {
             "recall_at_k": recall.as_dict(),
             "recall_at_k_first_call": recall_first.as_dict(),
-            "task_success_rate": success.as_dict(),
+            "task_success_rate": success_block,
             "tool_accuracy": tool.as_dict(),
             "tool_set_accuracy": tool_set.as_dict(),
             "consistency": consistency,
@@ -254,6 +266,63 @@ def load_agreement_if_present() -> dict | None:
     return stats
 
 
+def load_judge_backfill(
+    traces: Mapping[str, AgentTrace], path: Path | str | None = None
+) -> tuple[dict[str, int], dict] | tuple[None, None]:
+    """读回裁判分，供任务成功率回填开放题。返回 (可用的分数, 溯源信息)。
+
+    这里做一件 load_judge_scores 不做的事：**核对分和轨迹对不对得上**。
+    裁判分是给某一批答案打的，而报告可能是用另一批轨迹重算的
+    （`--from-traces` 就是这么用的）。旧分套新轨迹不会报错，只会静默地
+    产出一个错的成功率——所以逐条比对答案指纹：
+
+      verified   指纹对得上，可用；
+      stale      指纹对不上，**不采用**（答案已变，这个分作废）；
+      unverified 打分行没存指纹（本功能之前写的老文件），无从核对；
+                 采用，但在报告里标出来，别让读的人以为它被验过。
+
+    纯离线，不产生任何 API 调用。
+    """
+    from src.eval import judge
+
+    target = Path(path) if path else (config.REPORTS_DIR / judge.JUDGE_SCORES_FILENAME)
+    try:
+        rows = judge.load_judge_rows(target)
+    except FileNotFoundError:
+        return None, None
+    if not rows:
+        return None, None
+
+    scores: dict[str, int] = {}
+    verified, unverified, stale = [], [], []
+    for row in rows:
+        sid, score = row["id"], row.get("judge_score")
+        if score is None:
+            continue
+        trace = traces.get(sid)
+        want = row.get("answer_sha1")
+        if want is None:
+            unverified.append(sid)
+        elif trace is None or judge.answer_fingerprint(trace.answer) != want:
+            stale.append(sid)
+            continue
+        else:
+            verified.append(sid)
+        scores[sid] = int(score)
+
+    models = sorted({row.get("judge_model") for row in rows if row.get("judge_model")})
+    provenance = {
+        "source": str(target),
+        "judge_model": models[0] if len(models) == 1 else models,
+        "open_threshold": config.OPEN_SUCCESS_THRESHOLD,
+        "n_rows": len(rows),
+        "verified": verified,
+        "unverified": unverified,
+        "stale": stale,
+    }
+    return scores, provenance
+
+
 def load_ragas_baseline(path: Path | str) -> dict | None:
     """从上一份报告 JSON 里取出 RAGAS 段，用作换裁判前的对照基线。
 
@@ -279,6 +348,70 @@ def _fmt(value: float | None) -> str:
     return "—" if value is None else f"{value:.3f}"
 
 
+def _render_success_rule(report: dict) -> list[str]:
+    """任务成功率的口径自述。
+
+    这个数是两把尺子拼出来的（闭合题规则 + 开放题裁判），
+    不把拼法、门槛、失败题和裁判分的溯源写在数字旁边，
+    "任务成功率 0.972" 就是个无法回溯的漂亮数字——第一红线不允许。
+    """
+    sr = report["metrics"]["task_success_rate"]
+    meta = sr.get("meta") or {}
+    backfill = sr.get("backfill")
+    if not backfill:
+        return []
+
+    by_id = {row["id"]: row for row in report.get("per_question", [])}
+    failed = [
+        sid for sid, ok in (sr.get("detail") or {}).items() if ok is False
+    ]
+
+    def _label(sid: str) -> str:
+        src = (meta.get("source") or {}).get(sid)
+        kind = {"rule": "闭合/规则", "judge": "开放/裁判"}.get(src, "?")
+        return f"`{sid}`（{kind}）"
+
+    out = [
+        "",
+        "### 任务成功率的判定口径",
+        "",
+        f"- 闭合题 **{meta.get('n_rule_judged')}** 题：`answer_keys` 全部命中才算成功。",
+        f"- 开放题 **{meta.get('n_judge_judged')}** 题：裁判（`{backfill.get('judge_model')}`）"
+        f"打分 **≥ {meta.get('open_threshold')}** 才算成功——"
+        f"三级标度里 1 分是「方向对但要点有遗漏」，**不计成功**。",
+        f"- 裁判分来源：`{Path(backfill.get('source', '')).name}`。",
+    ]
+    unjudged = meta.get("unjudged") or []
+    if unjudged:
+        out.append(
+            f"- ⚠ 未判定（计入 total 不计入 n）：{', '.join(f'`{x}`' for x in unjudged)}"
+        )
+    stale = backfill.get("stale") or []
+    if stale:
+        out.append(
+            f"- ⚠ **已作废**（打分时的答案与本批轨迹对不上，不予采用）："
+            f"{', '.join(f'`{x}`' for x in stale)}"
+        )
+    unverified = backfill.get("unverified") or []
+    if unverified:
+        out.append(
+            f"- ⚠ 未核验（打分行没存答案指纹，无从机器确认它是给这批轨迹打的）："
+            f"{len(unverified)} 行——重跑一次 `python -m src.eval.judge --score` 即可补上。"
+        )
+    if failed:
+        out.append("")
+        out.append("未通过的题：")
+        for sid in failed:
+            row = by_id.get(sid) or {}
+            note = ""
+            if (meta.get("source") or {}).get(sid) == "judge":
+                note = "裁判未给满分"
+            elif row.get("answer_type") == "closed":
+                note = "answer_keys 未全部命中"
+            out.append(f"- {_label(sid)} {note}")
+    return out
+
+
 def render_markdown(report: dict) -> str:
     """人看的版本。每个指标都带分母，这是硬要求。"""
     meta, m = report["meta"], report["metrics"]
@@ -298,10 +431,21 @@ def render_markdown(report: dict) -> str:
         "|---|---|---|---|",
     ]
 
+    sr = m["task_success_rate"]
+    sr_meta = sr.get("meta") or {}
+    sr_backfill = sr.get("backfill")
+    success_note = (
+        f"闭合题 {sr_meta.get('n_rule_judged')} 题走 answer_keys；"
+        f"开放题 {sr_meta.get('n_judge_judged')} 题走裁判分，"
+        f"满 {sr_meta.get('open_threshold')} 分才算成功"
+        if sr_backfill
+        else "闭合题规则判定；开放题未回填裁判分，不计入分母"
+    )
+
     rows = [
         ("检索召回率 recall@k", "recall_at_k", "全部检索结果的并集"),
         ("recall@k（仅首次检索）", "recall_at_k_first_call", "只算第一次检索；与上一行的差＝多次检索捞回了多少"),
-        ("任务成功率", "task_success_rate", "闭合题规则判定；开放题待 M5 裁判"),
+        ("任务成功率", "task_success_rate", success_note),
         ("工具调用准确率（严格）", "tool_accuracy", "折叠连续重复后逐项比对"),
         ("工具调用准确率（宽松）", "tool_set_accuracy", "只看用了哪些工具，不看顺序"),
     ]
@@ -310,6 +454,8 @@ def render_markdown(report: dict) -> str:
         lines.append(
             f"| {label} | {_fmt(item['value'])} | n={item['n']}/{item['total']} | {note} |"
         )
+
+    lines += _render_success_rule(report)
 
     cold, hot = m.get("consistency"), m.get("consistency_hot")
     if cold or hot:
@@ -459,9 +605,12 @@ def render_markdown(report: dict) -> str:
         "",
         "## 逐题明细",
         "",
-        "| id | 题型 | 期望工具 | 实际工具 | 工具 | recall | 成功 | 停止原因 |",
-        "|---|---|---|---|---|---|---|---|",
+        "| id | 题型 | 期望工具 | 实际工具 | 工具 | recall | 成功 | 判据 | 停止原因 |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
+    # 「判据」这一列是回填后新增的：同一列 ✔ 现在可能来自两种判定，
+    # 不标出来就分不清哪个 ✔ 是规则判的、哪个是裁判判的。
+    source_label = {"rule": "规则", "judge": "裁判"}
     for q in report["per_question"]:
         def mark(v):
             return "—" if v is None else ("✔" if v else "✘")
@@ -469,7 +618,8 @@ def render_markdown(report: dict) -> str:
         lines.append(
             f"| {q['id']} | {q['answer_type']} | {'+'.join(q['expected_tool'])} | "
             f"{'+'.join(q['actual_tool']) if q['actual_tool'] else '（无）'} | {mark(q['tool_ok'])} | "
-            f"{_fmt(q['recall_at_k'])} | {mark(q['success'])} | {q['stop_reason']} |"
+            f"{_fmt(q['recall_at_k'])} | {mark(q['success'])} | "
+            f"{source_label.get(q.get('success_source'), '—')} | {q['stop_reason']} |"
         )
     lines.append("")
     return "\n".join(lines)
@@ -606,6 +756,10 @@ def write_report(
 GATE_FIXTURE_DIR = Path(__file__).resolve().parent.parent.parent / "tests" / "fixtures"
 GATE_SAMPLES_PATH = GATE_FIXTURE_DIR / "gate_samples.jsonl"
 GATE_TRACES_PATH = GATE_FIXTURE_DIR / "gate_traces.jsonl"
+# 裁判分现在是任务成功率的输入之一，所以它也必须被冻结进 fixture。
+# 让闸 A 去读 reports/judge_scores.jsonl 就等于让门禁的输入随手一跑就变——
+# 那道闸测的就不再是"口径有没有变"了。
+GATE_JUDGE_SCORES_PATH = GATE_FIXTURE_DIR / "gate_judge_scores.jsonl"
 GATE_BASELINE_FILENAME = "gate_baseline.json"
 
 # 闸 A 盯的指标：全部可离线重算的自定义指标。
@@ -620,24 +774,37 @@ GATE_EXACT_METRICS = (
 
 
 def load_gate_fixture(
-    samples_path: Path | str | None = None, traces_path: Path | str | None = None
+    samples_path: Path | str | None = None,
+    traces_path: Path | str | None = None,
+    judge_scores_path: Path | str | None = None,
 ):
-    """读回冻结的门禁子集。刻意含已知失败样本——输入全是满分的门禁形同虚设。"""
+    """读回冻结的门禁子集，返回 (样本, 轨迹, 裁判分)。
+
+    刻意含已知失败样本——输入全是满分的门禁形同虚设。
+    裁判分也在冻结之列：任务成功率的开放题那一半靠它判定。
+    """
+    from src.eval import judge
     from src.eval.datasets import GoldenSample
 
     sp = Path(samples_path) if samples_path else GATE_SAMPLES_PATH
     tp = Path(traces_path) if traces_path else GATE_TRACES_PATH
+    jp = Path(judge_scores_path) if judge_scores_path else GATE_JUDGE_SCORES_PATH
     samples = [
         GoldenSample.model_validate_json(line)
         for line in sp.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    return samples, load_traces(tp)
+    traces = load_traces(tp)
+
+    # fixture 的裁判分同样要过指纹核对：冻结轨迹若被改过而分没跟着改，
+    # 门禁就会拿着对不上的分算出一个"稳定"的数字，那正是本机制要防的。
+    scores, _ = load_judge_backfill(traces, jp)
+    return samples, traces, (scores or {})
 
 
-def compute_gate_metrics(samples, traces) -> dict:
+def compute_gate_metrics(samples, traces, judge_scores=None) -> dict:
     """闸 A 的被测量：从冻结输入重算出的那几个指标。"""
-    rep = build_report(samples, traces)
+    rep = build_report(samples, traces, judge_scores=judge_scores)
     return {
         name: {
             "value": rep["metrics"][name]["value"],
@@ -654,7 +821,7 @@ def write_gate_baseline(path: Path | None = None) -> Path:
     **这不是日常操作**：输入是冻结的，基线变动只可能因为口径变了。
     执行它等于宣布"我确实改了指标定义"，必须同时在报告/PR 里说明改了什么、为什么。
     """
-    samples, traces = load_gate_fixture()
+    samples, traces, judge_scores = load_gate_fixture()
     target = Path(path) if path else (config.REPORTS_DIR / GATE_BASELINE_FILENAME)
     target.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -662,9 +829,11 @@ def write_gate_baseline(path: Path | None = None) -> Path:
             "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "git_commit": _git_commit(),
             "fixture_ids": [s.id for s in samples],
+            "judge_scored_ids": sorted(judge_scores),
+            "open_success_threshold": config.OPEN_SUCCESS_THRESHOLD,
             "note": "闸 A 基线：输入冻结，重算必须逐位相等。改动它=改了指标口径。",
         },
-        "metrics": compute_gate_metrics(samples, traces),
+        "metrics": compute_gate_metrics(samples, traces, judge_scores),
     }
     target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return target
@@ -683,8 +852,8 @@ def load_gate_baseline(path: Path | None = None) -> dict:
 def check_exact_gate(baseline: dict | None = None) -> list[dict]:
     """闸 A：冻结输入下重算，逐项与基线比对。返回 findings。"""
     base = baseline if baseline is not None else load_gate_baseline()
-    samples, traces = load_gate_fixture()
-    current = compute_gate_metrics(samples, traces)
+    samples, traces, judge_scores = load_gate_fixture()
+    current = compute_gate_metrics(samples, traces, judge_scores)
 
     findings = []
     for name in GATE_EXACT_METRICS:
@@ -720,6 +889,14 @@ def _metric_value(report: Mapping, name: str):
     return scores.get(name)
 
 
+def _metric_n(report: Mapping, name: str):
+    """取一个指标自己的分母。RAGAS 段里的指标没有这个字段，返回 None。"""
+    item = (report.get("metrics") or {}).get(name)
+    if isinstance(item, Mapping):
+        return item.get("n")
+    return None
+
+
 def check_regression_gate(
     current: Mapping,
     baseline: Mapping,
@@ -730,6 +907,11 @@ def check_regression_gate(
 
     两份报告的黄金集规模不同就不比——那是在不同题目集上算的均值，
     差值没有意义（同 §RAGAS 的分母陷阱）。如实标 incomparable，不硬凑。
+
+    **单个指标自己的分母变了同样不比。** 任务成功率从"26 道闭合题"扩到
+    "36 道全集"时，题数没变、指标名没变，差值却完全来自口径而非模型——
+    只看 golden_set_size 会把这种变动当成一次普通波动放过去。
+    这是"闸 A 拦口径"在报告层面的对应物。
     """
     tol = config.METRIC_DROP_TOLERANCE if tolerance is None else tolerance
     cur_size = (current.get("meta") or {}).get("golden_set_size")
@@ -745,7 +927,16 @@ def check_regression_gate(
                 {"metric": name, "status": "missing", "baseline": old, "current": new}
             )
             continue
-        if not comparable:
+        old_n, new_n = _metric_n(baseline, name), _metric_n(current, name)
+        denominator_moved = (
+            old_n is not None and new_n is not None and old_n != new_n
+        )
+        if not comparable or denominator_moved:
+            note = (
+                f"黄金集规模不同（{base_size} -> {cur_size}），均值不在同一批题上"
+                if not comparable
+                else f"该指标分母变了（n={old_n} -> n={new_n}），差值来自口径而非模型"
+            )
             findings.append(
                 {
                     "metric": name,
@@ -753,7 +944,7 @@ def check_regression_gate(
                     "baseline": old,
                     "current": new,
                     "delta": new - old,
-                    "note": f"黄金集规模不同（{base_size} -> {cur_size}），均值不在同一批题上",
+                    "note": note,
                 }
             )
             continue
@@ -872,6 +1063,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="重写闸 A 基线。仅在**有意变更指标口径**时执行，并须在 PR/报告里说明",
     )
+    parser.add_argument(
+        "--judge-scores",
+        type=str,
+        default=None,
+        help="裁判打分文件（默认 reports/judge_scores.jsonl），用于回填开放题的任务成功率",
+    )
+    parser.add_argument(
+        "--no-judge-backfill",
+        action="store_true",
+        help="不回填开放题：任务成功率退回只算闭合题（分母会缩小，报告里会写明）",
+    )
     parser.add_argument("--notes", type=str, default="", help="写进报告的备注")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
@@ -956,6 +1158,27 @@ def main(argv: list[str] | None = None) -> int:
     if agreement:
         print(f"自动↔人工一致率：n={agreement['n']}", file=sys.stderr)
 
+    judge_scores, judge_backfill = (None, None)
+    if not args.no_judge_backfill:
+        judge_scores, judge_backfill = load_judge_backfill(traces, args.judge_scores)
+    if judge_backfill:
+        print(
+            f"任务成功率回填开放题：{len(judge_scores)} 条裁判分"
+            f"（验过指纹 {len(judge_backfill['verified'])}、"
+            f"未存指纹 {len(judge_backfill['unverified'])}、"
+            f"已作废 {len(judge_backfill['stale'])}），"
+            f"门槛 ≥{config.OPEN_SUCCESS_THRESHOLD}",
+            file=sys.stderr,
+        )
+        if judge_backfill["stale"]:
+            print(
+                f"  ⚠ 这些题的裁判分与当前轨迹对不上，已丢弃："
+                f"{judge_backfill['stale']}（重跑 judge --score 可修）",
+                file=sys.stderr,
+            )
+    else:
+        print("没有可用的裁判分：开放题不计入任务成功率", file=sys.stderr)
+
     report = build_report(
         samples,
         traces,
@@ -965,6 +1188,8 @@ def main(argv: list[str] | None = None) -> int:
         ragas=ragas_result,
         ragas_baseline=ragas_baseline,
         agreement=agreement,
+        judge_scores=judge_scores,
+        judge_backfill=judge_backfill,
         notes=args.notes,
     )
     paths = write_report(

@@ -16,6 +16,7 @@ build_labeling_sheet 显式忽略任何传进来的裁判分数。
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -370,6 +371,19 @@ class DeepSeekJudge:
         raise RuntimeError(f"裁判调用全部参数组合都被拒绝（{sample_id}）：{last_error}")
 
 
+def answer_fingerprint(answer: str) -> str:
+    """被打分的那段答案的指纹，写进打分行。
+
+    裁判分是**对某一批轨迹的答案**打的。重跑一次 Agent，答案就变了，
+    旧分再套上去等于拿甲的答卷给乙判分——而任务成功率现在正是靠这些分
+    回填开放题的，一次静默错配就能凭空造出一个指标。
+    存下指纹，回填时逐条核对，对不上就不算数（见 report.load_judge_backfill）。
+
+    只截 12 位十六进制：这是防错配，不是防篡改，够用且让打分文件保持可读。
+    """
+    return hashlib.sha1((answer or "").encode("utf-8")).hexdigest()[:12]
+
+
 def score_samples(
     samples: Sequence[GoldenSample],
     traces: Mapping[str, AgentTrace],
@@ -409,6 +423,7 @@ def score_samples(
                 "retried": retried,
                 "failure_tag": sample.failure_tag,
                 "judge_model": model,
+                "answer_sha1": answer_fingerprint(answer),
             }
         )
     return rows
@@ -423,22 +438,33 @@ def write_judge_scores(rows: Sequence[Mapping], path: Path | None = None) -> Pat
     return target
 
 
-def load_judge_scores(path: Path | None = None) -> dict[str, int]:
+def load_judge_rows(path: Path | None = None) -> list[dict]:
+    """读回裁判打分的**完整行**（含指纹与理由），不只是分数。
+
+    任务成功率回填要用到 answer_sha1 来核对"这个分是不是给这批轨迹打的"，
+    所以需要整行；只要分数的场景继续用 load_judge_scores。
+    """
     target = Path(path) if path is not None else (config.REPORTS_DIR / JUDGE_SCORES_FILENAME)
     if not target.exists():
         raise FileNotFoundError(f"裁判打分文件不存在：{target}")
-    scores: dict[str, int] = {}
+    rows: list[dict] = []
     for line in target.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         row = json.loads(line)
         score = row.get("judge_score")
-        if score is None:
-            continue
-        if score not in LABEL_SCALE:
+        if score is not None and score not in LABEL_SCALE:
             raise ValueError(f"{row['id']} 的 judge_score={score} 非法，只能是 0/1/2")
-        scores[row["id"]] = int(score)
-    return scores
+        rows.append(row)
+    return rows
+
+
+def load_judge_scores(path: Path | None = None) -> dict[str, int]:
+    return {
+        row["id"]: int(row["judge_score"])
+        for row in load_judge_rows(path)
+        if row.get("judge_score") is not None
+    }
 
 
 # ------------------------------------------------------------ 一致率 / kappa

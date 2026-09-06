@@ -1,7 +1,7 @@
 # 评测报告
 
-- 时间（UTC）：2026-09-06T03:38:55+00:00
-- git commit：`daf6152`
+- 时间（UTC）：2026-09-06T07:22:14+00:00
+- git commit：`e4583f0`
 - 被测模型：`deepseek-chat`（temperature=0.0）
 - Embedding：`BAAI/bge-large-zh-v1.5`（查询指令前缀=True）
 - 检索 top-k：4；切分 500/80
@@ -13,9 +13,19 @@
 |---|---|---|---|
 | 检索召回率 recall@k | 0.968 | n=31/36 | 全部检索结果的并集 |
 | recall@k（仅首次检索） | 0.774 | n=31/36 | 只算第一次检索；与上一行的差＝多次检索捞回了多少 |
-| 任务成功率 | 1.000 | n=26/36 | 闭合题规则判定；开放题待 M5 裁判 |
+| 任务成功率 | 0.972 | n=36/36 | 闭合题 26 题走 answer_keys；开放题 10 题走裁判分，满 2 分才算成功 |
 | 工具调用准确率（严格） | 0.944 | n=36/36 | 折叠连续重复后逐项比对 |
 | 工具调用准确率（宽松） | 0.944 | n=36/36 | 只看用了哪些工具，不看顺序 |
+
+### 任务成功率的判定口径
+
+- 闭合题 **26** 题：`answer_keys` 全部命中才算成功。
+- 开放题 **10** 题：裁判（`deepseek-reasoner`）打分 **≥ 2** 才算成功——三级标度里 1 分是「方向对但要点有遗漏」，**不计成功**。
+- 裁判分来源：`judge_scores.jsonl`。
+- ⚠ 未核验（打分行没存答案指纹，无从机器确认它是给这批轨迹打的）：10 行——重跑一次 `python -m src.eval.judge --score` 即可补上。
+
+未通过的题：
+- `cap_007`（开放/裁判） 裁判未给满分
 
 ## RAGAS（生成质量）
 
@@ -104,41 +114,41 @@ K8s 题把规格书「明确禁止、不引入 K8s/Airflow/云服务」弱化成
 
 ## 逐题明细
 
-| id | 题型 | 期望工具 | 实际工具 | 工具 | recall | 成功 | 停止原因 |
-|---|---|---|---|---|---|---|---|
-| cap_001 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_002 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_003 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_004 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_005 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_006 | closed | retrieve+calc | retrieve+calc | ✔ | 1.000 | ✔ | answered |
-| cap_007 | open | retrieve | retrieve | ✔ | 1.000 | — | answered |
-| cap_008 | open | retrieve | retrieve | ✔ | 1.000 | — | answered |
-| cap_009 | closed | calc | calc | ✔ | — | ✔ | answered |
-| cap_010 | open | retrieve | retrieve | ✔ | — | — | answered |
-| cap_011 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_012 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_013 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_014 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_015 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_016 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_017 | open | retrieve | retrieve | ✔ | 1.000 | — | answered |
-| cap_018 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_019 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_020 | open | retrieve | retrieve | ✔ | 1.000 | — | answered |
-| cap_021 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_022 | open | retrieve | retrieve | ✔ | 1.000 | — | answered |
-| cap_023 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_024 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_025 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_026 | open | retrieve | retrieve | ✔ | 1.000 | — | answered |
-| cap_027 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_028 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_029 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_030 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_031 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | answered |
-| cap_032 | open | retrieve | retrieve | ✔ | 1.000 | — | answered |
-| cap_033 | closed | calc | retrieve+calc | ✘ | — | ✔ | answered |
-| cap_034 | closed | calc | calc+retrieve | ✘ | — | ✔ | answered |
-| cap_035 | open | retrieve | retrieve | ✔ | 0.000 | — | answered |
-| cap_036 | open | retrieve | retrieve | ✔ | — | — | answered |
+| id | 题型 | 期望工具 | 实际工具 | 工具 | recall | 成功 | 判据 | 停止原因 |
+|---|---|---|---|---|---|---|---|---|
+| cap_001 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_002 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_003 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_004 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_005 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_006 | closed | retrieve+calc | retrieve+calc | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_007 | open | retrieve | retrieve | ✔ | 1.000 | ✘ | 裁判 | answered |
+| cap_008 | open | retrieve | retrieve | ✔ | 1.000 | ✔ | 裁判 | answered |
+| cap_009 | closed | calc | calc | ✔ | — | ✔ | 规则 | answered |
+| cap_010 | open | retrieve | retrieve | ✔ | — | ✔ | 裁判 | answered |
+| cap_011 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_012 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_013 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_014 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_015 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_016 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_017 | open | retrieve | retrieve | ✔ | 1.000 | ✔ | 裁判 | answered |
+| cap_018 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_019 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_020 | open | retrieve | retrieve | ✔ | 1.000 | ✔ | 裁判 | answered |
+| cap_021 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_022 | open | retrieve | retrieve | ✔ | 1.000 | ✔ | 裁判 | answered |
+| cap_023 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_024 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_025 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_026 | open | retrieve | retrieve | ✔ | 1.000 | ✔ | 裁判 | answered |
+| cap_027 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_028 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_029 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_030 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_031 | closed | retrieve | retrieve | ✔ | 1.000 | ✔ | 规则 | answered |
+| cap_032 | open | retrieve | retrieve | ✔ | 1.000 | ✔ | 裁判 | answered |
+| cap_033 | closed | calc | retrieve+calc | ✘ | — | ✔ | 规则 | answered |
+| cap_034 | closed | calc | calc+retrieve | ✘ | — | ✔ | 规则 | answered |
+| cap_035 | open | retrieve | retrieve | ✔ | 0.000 | ✔ | 裁判 | answered |
+| cap_036 | open | retrieve | retrieve | ✔ | — | ✔ | 裁判 | answered |

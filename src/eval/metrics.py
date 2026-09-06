@@ -8,7 +8,7 @@
 
 三条贯穿始终的原则：
   1. **无定义就返回 None，不要当 0。** 纯算术题没有应检索文档，把它算成
-     recall=0 会凭空拉低指标；开放题在 M3 无法规则判定，硬判对错就是编数。
+     recall=0 会凭空拉低指标；开放题没有裁判分时判不了，硬判对错就是编数。
   2. **分母如实上报。** 每个指标都带 (n 实际计入 / total 总题数)，
      报告里必须把分母写出来，不许拿全集稀释或抬高。
   3. **严格与宽松口径并列。** 工具序列比对给严格（有序）和宽松（集合）两版，
@@ -24,6 +24,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping, Sequence
 
+from src import config
 from src.agent.trace import AgentTrace
 from src.eval.datasets import GoldenSample
 
@@ -59,19 +60,26 @@ class MetricResult:
     n: int
     total: int
     detail: dict[str, float | bool | None] = field(default_factory=dict)
+    # 口径自述：这个均值是**怎么**算出来的（哪题走规则、哪题走裁判、阈值多少）。
+    # 混合口径的指标不带这个，读报告的人就分不清 0.972 是三十六题都判过、
+    # 还是二十六题判过十题空着——那正是这次回填要消灭的歧义。
+    meta: dict = field(default_factory=dict)
 
     @property
     def denominator_note(self) -> str:
         return f"n={self.n}/{self.total}"
 
     def as_dict(self) -> dict:
-        return {
+        out = {
             "name": self.name,
             "value": self.value,
             "n": self.n,
             "total": self.total,
             "detail": self.detail,
         }
+        if self.meta:
+            out["meta"] = self.meta
+        return out
 
 
 def _mean(values: Sequence[float]) -> float | None:
@@ -202,26 +210,88 @@ def aggregate_recall(
 def judge_closed(sample: GoldenSample, answer: str) -> bool | None:
     """闭合题规则判定：answer_keys 必须**全部**命中最终答案。
 
-    开放题返回 None——M3 没有裁判层，硬判就是编数，留给 M5。
+    开放题返回 None——规则判不了它，硬判就是编数，交给 judge_open。
     """
     if sample.answer_type != "closed":
         return None
     return all(key_hits(key, answer) for key in sample.answer_keys)
 
 
+def judge_open(
+    sample: GoldenSample, judge_score: int | None, threshold: int | None = None
+) -> bool | None:
+    """开放题裁判判定：裁判分达到 threshold（默认 2，即满分）才算成功。
+
+    三级标度里 1 分是"方向对、但要点有遗漏"。把它算成功，
+    "任务成功率"衡量的就变成了"没答错"而不是"答对了"——两码事。
+    所以门槛定在满分，口径写在 config.OPEN_SUCCESS_THRESHOLD。
+
+    两种 None 各有各的含义，都不能当失败：
+      - 闭合题：它归 judge_closed 管，裁判分不该覆盖规则判定；
+      - 开放题但没有裁判分：**没判过就是没判过**。计成 0 会凭空拉低成功率，
+        计成 1 是编数——如实不计入分母，让报告里的 n 自己说话。
+    """
+    if sample.answer_type == "closed":
+        return None
+    if judge_score is None:
+        return None
+    limit = config.OPEN_SUCCESS_THRESHOLD if threshold is None else threshold
+    return int(judge_score) >= limit
+
+
 def task_success_rate(
-    samples: Sequence[GoldenSample], traces: Mapping[str, AgentTrace]
+    samples: Sequence[GoldenSample],
+    traces: Mapping[str, AgentTrace],
+    judge_scores: Mapping[str, int] | None = None,
+    open_threshold: int | None = None,
 ) -> MetricResult:
-    """任务成功率。M3 只统计闭合题，开放题计入 total 但不计入 n。"""
+    """任务成功率：闭合题走规则判定，开放题走裁判分。
+
+    不传 judge_scores 时开放题判不了，计入 total 但不计入 n——
+    这正是 M3~M4 期间的行为（那时报的 1.000 只对 26 道闭合题成立）。
+    传了才是 CLAUDE.md §6 表格里写的完整口径。
+
+    meta 里记下每题走的是哪条判定路径与开放题的门槛：
+    一个混合口径的均值，不带这个就没法回溯它是怎么来的。
+    """
+    scores = judge_scores or {}
+    limit = config.OPEN_SUCCESS_THRESHOLD if open_threshold is None else open_threshold
+
     detail: dict[str, float | bool | None] = {}
+    source: dict[str, str] = {}
     hits: list[float] = []
     for s in samples:
         trace = traces.get(s.id)
-        verdict = None if trace is None else judge_closed(s, trace.answer)
+        if trace is None:
+            verdict = None
+        elif s.answer_type == "closed":
+            verdict = judge_closed(s, trace.answer)
+            if verdict is not None:
+                source[s.id] = "rule"
+        else:
+            verdict = judge_open(s, scores.get(s.id), limit)
+            if verdict is not None:
+                source[s.id] = "judge"
         detail[s.id] = verdict
         if verdict is not None:
             hits.append(1.0 if verdict else 0.0)
-    return MetricResult("task_success_rate", _mean(hits), len(hits), len(samples), detail)
+
+    n_rule = sum(1 for v in source.values() if v == "rule")
+    n_judge = sum(1 for v in source.values() if v == "judge")
+    meta = {
+        "rule": (
+            "closed: answer_keys 全部命中; "
+            f"open: judge_score >= {limit}"
+        ),
+        "open_threshold": limit,
+        "n_rule_judged": n_rule,
+        "n_judge_judged": n_judge,
+        "unjudged": [s.id for s in samples if s.id not in source],
+        "source": source,
+    }
+    return MetricResult(
+        "task_success_rate", _mean(hits), len(hits), len(samples), detail, meta
+    )
 
 
 # ============================================================== 多轮一致性
@@ -302,7 +372,10 @@ def consistency(
             entry["success_rate"] = rate
             entry["success_variance"] = var
         else:
-            entry["success_agreement"] = None  # 开放题，M3 无法规则判定
+            # 开放题这里**刻意不回填裁判分**：裁判是对主评测那一次答案打的分，
+            # 多轮一致性跑的是 K 个各不相同的答案，把同一个分套上去就是张冠李戴。
+            # 要覆盖开放题就得对 K 次答案各判一次（K 倍裁判成本），属 v2。
+            entry["success_agreement"] = None
 
         detail[s.id] = entry
 

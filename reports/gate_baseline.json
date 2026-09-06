@@ -1,7 +1,7 @@
 {
   "meta": {
-    "timestamp_utc": "2026-09-06T03:42:23+00:00",
-    "git_commit": "daf6152",
+    "timestamp_utc": "2026-09-06T07:19:34+00:00",
+    "git_commit": "e4583f0",
     "fixture_ids": [
       "cap_001",
       "cap_005",
@@ -14,6 +14,14 @@
       "cap_035",
       "cap_036"
     ],
+    "judge_scored_ids": [
+      "cap_007",
+      "cap_010",
+      "cap_026",
+      "cap_035",
+      "cap_036"
+    ],
+    "open_success_threshold": 2,
     "note": "闸 A 基线：输入冻结，重算必须逐位相等。改动它=改了指标口径。"
   },
   "metrics": {
@@ -28,8 +36,8 @@
       "total": 10
     },
     "task_success_rate": {
-      "value": 1.0,
-      "n": 5,
+      "value": 0.9,
+      "n": 10,
       "total": 10
     },
     "tool_accuracy": {

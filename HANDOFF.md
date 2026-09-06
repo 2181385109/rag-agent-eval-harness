@@ -32,9 +32,10 @@ b0aec2d  feat(eval): LLM-as-Judge 打分与自动↔人工一致率（kappa）
 
 ## 二、当前真实指标（全部可复现，不许改动数字）
 
-出处：[reports/report.md](reports/report.md)，对应快照 `reports/eval_20260906T033855Z.json`。
-**报告 meta 里记的 git commit 是 `daf6152`**——那是跑评测时的代码状态，
-比封版的三个 commit 早；下次重跑会自动更新为当时的 commit。
+出处：[reports/report.md](reports/report.md)，对应快照 `reports/eval_20260906T072214Z.json`。
+轨迹是同一份 `reports/traces_latest.jsonl`（2026-09-06T03:38 那次真实运行），
+之后的两次报告都是 `--from-traces` 重算，没有重跑过 Agent——
+所以除任务成功率外的数字与上一份快照逐位相同。
 
 | 指标 | 值 | 分母 / 必须连带说明的限定 |
 |---|---|---|
@@ -42,7 +43,7 @@ b0aec2d  feat(eval): LLM-as-Judge 打分与自动↔人工一致率（kappa）
 | 工具调用准确率（严格） | 0.944 | n=36/36 |
 | 检索召回率 recall@k | 0.968 | n=31/36（5 题无 `expected_doc_ids`，不计入） |
 | recall@k（仅首次检索） | 0.774 | n=31/36 |
-| **任务成功率** | **1.000** | **n=26/36 —— 只有闭合题，见待决 ①** |
+| **任务成功率** | **0.972** | **n=36/36**（闭合题 26 走规则 + 开放题 10 走裁判，门槛=2；唯一失败 cap_007） |
 | faithfulness | 0.862 | 35/35 行打满（1 条无检索内容被排除） |
 | answer_relevancy | 0.826 | 35/35 |
 | context_recall | 0.824 | 35/35 |
@@ -57,23 +58,28 @@ RAGAS 那一段在最新报告里是**复用**的（`--reuse-ragas`，同一批�
 
 ---
 
-## 三、三个待决问题（下一轮要先解决这些，再填简历 bullet）
+## 三、待决问题（②③ 未决，再填简历 bullet）
 
-### ① 任务成功率目前只算闭合题（n=26/36）
+### ① 任务成功率回填开放题 —— ✅ 已完成（2026-09-06）
 
-M4 时期报告里写的"开放题待 M5 裁判"至今**没有回填**：M5 的裁判分产出了
-（`reports/judge_scores.jsonl`），但 `metrics.task_success_rate` 仍只用
-`answer_keys` 规则判定闭合题。
+口径已拍板并落地：**闭合题 `answer_keys` 全命中；开放题裁判分 ≥2（即满分）才算成功**，
+1 分「方向对但要点有遗漏」不计成功。门槛在 `config.OPEN_SUCCESS_THRESHOLD`。
 
-所以 **"任务成功率 100%" 这句话现在只对 26 道闭合题成立**，直接写进简历会误导。
+同一批轨迹下：**1.000 (n=26/36) → 0.972 (n=36/36)**。
+唯一失败是 `cap_007`（裁判判 1 分：信贷侧缺 70/15/15、航班侧漏了时间序切分与
+tail_id GroupKFold）。**这 -0.028 全部来自口径，不含任何模型变化。**
 
-两条路（用户尚未拍板）：
-- **回填**：把开放题的裁判分并进 `task_success_rate`（"≥1 算成功"还是"=2 才算"需定口径），
-  分母变成 36/36。要改 `src/eval/metrics.py`，并**同步重写闸 A 基线**
-  （`python -m src.eval.report --write-gate-baseline`），且在提交信息里写明改了口径。
-- **不回填**：简历与 README 里如实写"闭合题任务成功率 1.000（n=26）"。
+连带做的三件事（细节见 CLAUDE.md §6 修订记录 6/7）：
 
-### ② kappa=0.216 偏低，且 n=10 不构成硬结论
+1. 裁判打分行新增 `answer_sha1` 指纹，回填时逐条核对"这个分是不是给这批轨迹打的"，
+   对不上就作废。**现有的 10 行是本机制之前写的，没有指纹**，报告里标为「未核验」——
+   下次跑 `judge --score` 就会自动补上（② 若要重跑裁判，这一项顺带就解决了）。
+2. 闸 A 的冻结输入新增 `tests/fixtures/gate_judge_scores.jsonl`；
+   闸 A 基线 `task_success_rate` 由 `1.000/n=5` 改为 `0.900/n=10`（已重写并提交）。
+3. 闸 B 新增「分母变动即 incomparable」。这次 n 从 26 变到 36，
+   旧逻辑会打印 `ok -0.0278` 把口径变动当噪声放过去；现在如实标 incomparable。
+
+### ② kappa=0.216 偏低，且 n=10 不构成硬结论（**下一步**）
 
 95% CI `[0.091, 0.750]` 横跨"几乎无一致"到"相当一致"。
 三种诚实写法（用户尚未选定）：
@@ -126,6 +132,9 @@ python -m src.eval.judge --kappa      # 纯离线
 
 # 有意变更指标口径时（会在提交历史里留痕）
 python -m src.eval.report --write-gate-baseline
+
+# 任务成功率退回"只算闭合题"的旧口径（对照用，不改基线）
+python -m src.eval.report --from-traces reports/traces_latest.jsonl --no-judge-backfill
 ```
 
 **本机注意**：跑测试要用 `./.venv/Scripts/python.exe -m pytest`（不能用全局 `python`）；
@@ -140,6 +149,8 @@ python -m src.eval.report --write-gate-baseline
 - **分母陷阱**：RAGAS 单个 job 失败会留 NaN 而 `mean()` 默认跳过它。
   看到 0.000 这种漂亮差值，先查"实际打分行数"。
 - **闸 A 是等值不是容差**，涨了也拦——输入冻结时数字没理由变。
+- **裁判分与轨迹必须配对**：重跑 Agent 后旧裁判分就作废了（指纹对不上会被丢弃并在
+  报告里列出）。看到"已作废 N 条"就是该重跑 `judge --score` 了，别忽略它。
 - **kappa 退化情形打印「未定义」，绝不落成 0.0**。
 - **标注纪律**：改 `expected_doc_ids` 只能依据 `data/annotation_criteria.md` 的书面判据，
   不许看着检索结果反推；确需修订就对全部题目重扫一遍并在报告里写明差值与归因。
