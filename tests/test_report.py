@@ -395,3 +395,136 @@ def test_baseline_extraction_keeps_scored_counts(tmp_path):
     )
     block = report_mod.load_ragas_baseline(path)
     assert block["scored_counts"]["faithfulness"] == 35
+
+
+# ===========================================================================
+# M5：一致率进报告 + RAGAS 段复用
+# ===========================================================================
+
+
+def test_agreement_section_lands_in_markdown():
+    """kappa 算出来了就得进报告，不能只活在终端里。"""
+    from src.eval import judge
+
+    samples = [make_sample(id="q1")]
+    traces = {"q1": make_trace(answer="a", tools=["retrieve"], retrieved=[["d1"]])}
+    ids = [f"q{i}" for i in range(10)]
+    stats = judge.agreement_stats(
+        dict(zip(ids, [0, 1, 1, 1, 1, 2, 2, 2, 2, 2])),
+        dict(zip(ids, [0, 1, 2, 1, 1, 2, 2, 1, 2, 2])),
+        bootstrap=50,
+    )
+    rep = report_mod.build_report(samples, traces, agreement=stats)
+    assert rep["metrics"]["agreement"]["n"] == 10
+
+    text = report_mod.render_markdown(rep)
+    assert "自动↔人工一致率" in text
+    assert "n=10" in text
+    assert "混淆矩阵" in text
+
+
+def test_reused_ragas_is_marked_as_reused(tmp_path):
+    """复用上一次的 RAGAS 分数可以，但必须留痕。
+
+    不标注就等于把 40 分钟前算的数字当成本次结果报出去——
+    读报告的人无从分辨，那是变相编造。
+    """
+    prior = tmp_path / "prev.json"
+    prior.write_text(
+        json.dumps(
+            {
+                "meta": {"timestamp_utc": "2026-09-05T14:25:07+00:00"},
+                "metrics": {
+                    "ragas": {
+                        "judge_model": "deepseek-reasoner",
+                        "scores": {"faithfulness": 0.9},
+                        "n_submitted": 35,
+                        "total": 36,
+                        "scored_counts": {"faithfulness": 35},
+                    }
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    block = report_mod.load_ragas_reuse(prior)
+    assert block["reused_from"] == str(prior)
+    assert block["reused_from_timestamp"] == "2026-09-05T14:25:07+00:00"
+
+    rep = report_mod.build_report([make_sample(id="q1")], {}, ragas=block)
+    text = report_mod.render_markdown(rep)
+    assert "复用" in text and str(prior) in text
+
+
+def test_reuse_ragas_returns_none_when_absent(tmp_path):
+    empty = tmp_path / "no_ragas.json"
+    empty.write_text(json.dumps({"meta": {}, "metrics": {}}), encoding="utf-8")
+    assert report_mod.load_ragas_reuse(empty) is None
+
+
+def test_reuse_marker_points_at_the_stable_snapshot(tmp_path):
+    """复用标记必须指向当初算出这批数的那次**快照**，不是 latest.json。
+
+    latest.json 每跑一次就被覆盖：标记指过去，下一次运行后它就指向了自己，
+    读报告的人无从追溯这批数究竟出自哪次运行。
+    """
+    stamp = "2026-09-05T14:25:07+00:00"
+    payload = {
+        "meta": {"timestamp_utc": stamp},
+        "metrics": {"ragas": {"judge_model": "deepseek-reasoner", "scores": {"faithfulness": 0.9}}},
+    }
+    snapshot = tmp_path / report_mod.snapshot_filename(stamp)
+    snapshot.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    latest = tmp_path / "latest.json"
+    latest.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    block = report_mod.load_ragas_reuse(latest)
+    assert block["reused_from"] == str(snapshot)
+    assert "latest.json" not in block["reused_from"]
+
+
+def test_reuse_marker_falls_back_when_snapshot_missing(tmp_path):
+    """快照不在（比如被清理过）就如实记录给定路径，不编一个不存在的文件名。"""
+    latest = tmp_path / "latest.json"
+    latest.write_text(
+        json.dumps(
+            {
+                "meta": {"timestamp_utc": "2026-09-05T14:25:07+00:00"},
+                "metrics": {"ragas": {"scores": {"faithfulness": 0.9}}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    block = report_mod.load_ragas_reuse(latest)
+    assert block["reused_from"] == str(latest)
+
+
+def test_reuse_does_not_nest_markers(tmp_path):
+    """从一份「已经是复用」的报告再复用，标记不该套娃。"""
+    src = tmp_path / "latest.json"
+    src.write_text(
+        json.dumps(
+            {
+                "meta": {"timestamp_utc": "2026-09-06T00:00:00+00:00"},
+                "metrics": {
+                    "ragas": {
+                        "scores": {"faithfulness": 0.9},
+                        "reused_from": "reports/old.json",
+                        "reused_from_timestamp": "2026-09-01T00:00:00+00:00",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    block = report_mod.load_ragas_reuse(src)
+    assert block["reused_from_timestamp"] == "2026-09-06T00:00:00+00:00"
+    assert "old.json" not in block["reused_from"]
+
+
+def test_snapshot_filename_matches_what_write_report_uses(tmp_path):
+    rep = report_mod.build_report([make_sample(id="q1")], {})
+    paths = report_mod.write_report(rep, directory=tmp_path)
+    assert paths["snapshot"].name == report_mod.snapshot_filename(rep["meta"]["timestamp_utc"])

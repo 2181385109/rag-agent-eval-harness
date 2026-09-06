@@ -85,6 +85,7 @@ def build_report(
     consistency_temperature: float | None = None,
     ragas: dict | None = None,
     ragas_baseline: dict | None = None,
+    agreement: dict | None = None,
     notes: str = "",
 ) -> dict:
     """把轨迹汇总成一份完整报告（纯函数，可在 CI 里用构造轨迹验证）。"""
@@ -181,6 +182,7 @@ def build_report(
             "consistency_hot": consistency_hot,
             "ragas": ragas,
             "ragas_baseline": ragas_baseline,
+            "agreement": agreement,
         },
         "tokens": {
             "prompt": prompt_tokens,
@@ -190,6 +192,66 @@ def build_report(
         "anomalies": anomalies,
         "per_question": per_question,
     }
+
+
+def snapshot_filename(timestamp_utc: str) -> str:
+    """报告快照的文件名。去掉 : - 和时区偏移里的 +，对 URL / shell 友好。
+
+    抽成函数是为了让「写快照」和「解析复用来源」用同一套命名规则——
+    两处各写一遍，早晚会对不上。
+    """
+    stamp = timestamp_utc.replace(":", "").replace("-", "")
+    stamp = stamp.split("+")[0].rstrip("Z") + "Z"
+    return f"eval_{stamp}.json"
+
+
+def load_ragas_reuse(path: Path | str) -> dict | None:
+    """从上一份报告里**原样取回** RAGAS 段。
+
+    只在"同一批轨迹"下成立：RAGAS 的输入就是 question/answer/contexts，
+    轨迹没变，重算一遍是花 40 分钟得到同一件事。但复用必须**留痕**——
+    报告里会写明这段不是本次算的，以及它来自哪一份快照。
+    """
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    block = (data.get("metrics") or {}).get("ragas")
+    if not block:
+        return None
+    block = dict(block)
+    # 若来源本身也是复用的，先清掉旧标记，免得层层套娃看不出真正的出处
+    block.pop("reused_from", None)
+    block.pop("reused_from_timestamp", None)
+
+    source = Path(path)
+    stamp = (data.get("meta") or {}).get("timestamp_utc")
+    # 记录**当初算出这批数的那次运行的快照名**，而不是 latest.json——
+    # 后者每跑一次就被覆盖，标记指过去就成了指向它自己，会误导后来的人。
+    if stamp:
+        canonical = source.parent / snapshot_filename(stamp)
+        if canonical.exists():
+            source = canonical
+    block["reused_from"] = str(source)
+    block["reused_from_timestamp"] = stamp
+    return block
+
+
+def load_agreement_if_present() -> dict | None:
+    """人工标注与裁判分数都在，就算一致率。缺任一边就返回 None（不猜、不补）。
+
+    纯离线计算，不产生任何 API 调用——所以 `--from-traces` 重出报告时它照样在。
+    """
+    from src.eval import judge
+
+    try:
+        human = judge.load_human_labels()
+        auto = judge.load_judge_scores()
+    except FileNotFoundError:
+        return None
+    if not human or not auto:
+        return None
+    stats = judge.agreement_stats(human, auto)
+    # 解读随报告一起落盘：读 JSON 快照的人也该看到这些限定，而不是只看到数字。
+    stats["interpretation"] = judge.load_agreement_interpretation()
+    return stats
 
 
 def load_ragas_baseline(path: Path | str) -> dict | None:
@@ -279,6 +341,13 @@ def render_markdown(report: dict) -> str:
             "## RAGAS（生成质量）",
             "",
             f"- 裁判模型：`{rg.get('judge_model')}`；embedding：`{rg.get('embedding_model')}`（本地，不外发）",
+        ]
+        if rg.get("reused_from"):
+            lines.append(
+                f"- ⚠ **本节为复用，不是本次重算**：分数原样取自 `{rg['reused_from']}`"
+                f"（{rg.get('reused_from_timestamp')}），前提是轨迹未变。"
+            )
+        lines += [
             f"- 提交评测：**{rg.get('n_submitted')}/{rg.get('total')}** 条"
             f"（排除 {rg.get('n_excluded')} 条：无答案或无检索内容，见下节）",
             "",
@@ -353,6 +422,12 @@ def render_markdown(report: dict) -> str:
                 "很可能只是两个不同样本集碰巧接近。要得到可比的对照，"
                 "必须两次都打满同样的行数。",
             ]
+
+    agreement = m.get("agreement")
+    if agreement:
+        from src.eval.judge import render_agreement_markdown
+
+        lines += ["", render_agreement_markdown(agreement).rstrip()]
 
     anomalies = report.get("anomalies") or []
     if anomalies:
@@ -487,11 +562,7 @@ def write_report(
     """落盘：时间戳快照 + latest.json + report.md（+ 轨迹）。"""
     target = directory or config.REPORTS_DIR
     target.mkdir(parents=True, exist_ok=True)
-    # 去掉 : - 和时区偏移里的 +，文件名对 URL / shell 友好
-    stamp = report["meta"]["timestamp_utc"].replace(":", "").replace("-", "")
-    stamp = stamp.split("+")[0].rstrip("Z") + "Z"
-
-    snapshot = target / f"eval_{stamp}.json"
+    snapshot = target / snapshot_filename(report["meta"]["timestamp_utc"])
     latest = target / "latest.json"
     markdown = target / "report.md"
 
@@ -551,6 +622,12 @@ def main(argv: list[str] | None = None) -> int:
         type=str,
         default=None,
         help="上一份报告 JSON 的路径，用其 RAGAS 分数做换裁判前的对照基线",
+    )
+    parser.add_argument(
+        "--reuse-ragas",
+        type=str,
+        default=None,
+        help="从上一份报告 JSON 原样取回 RAGAS 段（同一批轨迹下省 40 分钟；报告里会标注复用）",
     )
     parser.add_argument("--notes", type=str, default="", help="写进报告的备注")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
@@ -612,11 +689,20 @@ def main(argv: list[str] | None = None) -> int:
         print("RAGAS：基于同一批轨迹算生成质量指标（裁判走 DeepSeek）", file=sys.stderr)
         ragas_result = ragas_runner.run_ragas(samples, traces)
 
+    if ragas_result is None and args.reuse_ragas:
+        ragas_result = load_ragas_reuse(args.reuse_ragas)
+        if ragas_result:
+            print(f"复用 RAGAS 段：{args.reuse_ragas}（未重算）", file=sys.stderr)
+
     ragas_baseline = load_ragas_baseline(args.compare_ragas) if args.compare_ragas else None
     if ragas_baseline:
         print(
             f"裁判敏感性对照基线：{ragas_baseline['judge_model']}", file=sys.stderr
         )
+
+    agreement = load_agreement_if_present()
+    if agreement:
+        print(f"自动↔人工一致率：n={agreement['n']}", file=sys.stderr)
 
     report = build_report(
         samples,
@@ -626,6 +712,7 @@ def main(argv: list[str] | None = None) -> int:
         consistency_temperature=args.consistency_temperature,
         ragas=ragas_result,
         ragas_baseline=ragas_baseline,
+        agreement=agreement,
         notes=args.notes,
     )
     paths = write_report(

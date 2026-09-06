@@ -48,6 +48,10 @@ REQUEST_TIMEOUT_S = 60.0
 # faithfulness 只打了 31/35），故放宽到 600s。
 # 评测是离线批处理，稳比快重要。
 JUDGE_TIMEOUT_S = 600.0
+# 裁判打分的输出上限。reasoner 的推理 token 也计入 completion，
+# 给少了会在推理阶段就被截断、正文吐不出来，解析必然失败。
+JUDGE_MAX_TOKENS = 4096
+
 RAGAS_MAX_WORKERS = 2  # RAGAS 默认 16 并发，对 DeepSeek 太激进；降到 2 换取长尾任务不超时
 MAX_RETRIES = 2
 
@@ -57,6 +61,8 @@ DATA_DIR = PROJECT_ROOT / "data"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 GOLDEN_SET_PATH = DATA_DIR / "golden_capability.jsonl"
 HUMAN_LABELS_PATH = DATA_DIR / "human_labels.jsonl"
+# 一致率一节的人写解读（数字自动算，叙述人写，两者在报告里分区显示）
+AGREEMENT_INTERPRETATION_PATH = DATA_DIR / "agreement_interpretation.md"
 
 # ------------------------------------------------------------- 检索（M2 生效）
 CHUNK_SIZE = 500
