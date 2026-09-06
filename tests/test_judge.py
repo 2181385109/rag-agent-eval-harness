@@ -246,7 +246,46 @@ def test_judge_prompt_reuses_the_same_rubric_as_humans(open_samples):
     system = call.calls[0]["messages"][0]
     assert system["role"] == "system"
     for description in judge.LABEL_SCALE.values():
-        assert description in system["content"], "判据文本和标注表不同源"
+        assert judge._plain(description) in system["content"], "判据文本和标注表不同源"
+
+
+def test_judge_prompt_and_sheet_share_the_scoring_notes(open_samples):
+    """打分细则也必须同源。
+
+    v1 的教训：判据只说"要点齐全"、没说什么算一个要点，人和机器就各解释各的
+    （人比对要点层、机器比对结论层），kappa 被这道缝隙压到 0.216。
+    细则各写一份 = 把那道缝隙重新打开。
+    """
+    samples, traces = open_samples
+    call = _fake_call([_ok(2), _ok(1)])
+    judge.score_samples(samples, traces, call=call)
+    system = call.calls[0]["messages"][0]["content"]
+    sheet = judge.build_labeling_sheet(samples, traces)
+
+    assert judge.RUBRIC_NOTES, "细则不能是空的"
+    for note in judge.RUBRIC_NOTES:
+        assert judge._plain(note) in system, f"裁判提示词缺细则：{note[:20]}"
+        assert note in sheet, f"标注表缺细则：{note[:20]}"
+
+
+def test_rubric_is_point_level_not_conclusion_level():
+    """v2 判据的核心：缺一项具体限定就得降档，「结论一致」不足以给满分。
+
+    这条断言是这次修订的验收口径本身——判据要是被改回结论级，它必须红。
+    """
+    blob = judge.build_judge_system_prompt()
+    assert "具体限定" in blob
+    assert "缺一项即降到 1 分" in blob
+    assert "结论方向一致" in blob and "不足以给 2 分" in blob
+    assert "逐项" in blob
+
+
+def test_judge_scores_record_the_rubric_version(open_samples):
+    """分数要带判据版本：改前改后两批分混在一起就没法对照了。"""
+    samples, traces = open_samples
+    rows = judge.score_samples(samples, traces, call=_fake_call([_ok(2), _ok(1)]))
+    assert all(r["rubric_version"] == judge.RUBRIC_VERSION for r in rows)
+    assert all(r["answer_sha1"] for r in rows)
 
 
 def test_judge_prompt_flags_hallucination_bait(open_samples):

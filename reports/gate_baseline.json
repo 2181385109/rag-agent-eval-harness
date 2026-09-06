@@ -1,7 +1,7 @@
 {
   "meta": {
-    "timestamp_utc": "2026-09-06T07:19:34+00:00",
-    "git_commit": "e4583f0",
+    "timestamp_utc": "2026-09-06T08:41:02+00:00",
+    "git_commit": "5521864",
     "fixture_ids": [
       "cap_001",
       "cap_005",
@@ -36,7 +36,7 @@
       "total": 10
     },
     "task_success_rate": {
-      "value": 0.9,
+      "value": 0.8,
       "n": 10,
       "total": 10
     },

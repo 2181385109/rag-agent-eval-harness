@@ -233,6 +233,33 @@ def test_regression_gate_refuses_to_compare_across_a_denominator_change():
     assert findings["tool_accuracy"]["status"] == "ok", "别的指标不该被牵连"
 
 
+def _with_rubric(report, version):
+    report["metrics"]["task_success_rate"]["backfill"] = {"rubric_version": version}
+    return report
+
+
+def test_regression_gate_refuses_to_compare_across_a_rubric_change():
+    """换了裁判判据就是换了量尺，任务成功率的差值不归因于被测系统。
+
+    判据 v1（结论级）-> v2（要点级）那次：同一批轨迹、同一个模型，
+    两题掉档让成功率跌 0.056，按容差判会报 dropped——但 Agent 一点没变。
+    """
+    baseline = _with_rubric(_report(), "v1-结论级")
+    current = _with_rubric(_report(success=0.9166), "v2-要点级")
+    findings = {f["metric"]: f for f in report_mod.check_regression_gate(current, baseline)}
+    assert findings["task_success_rate"]["status"] == "incomparable"
+    assert "v1-结论级" in findings["task_success_rate"]["note"]
+    assert findings["tool_accuracy"]["status"] == "ok", "不吃裁判分的指标不该被牵连"
+
+
+def test_regression_gate_compares_normally_under_the_same_rubric():
+    """判据没换就照常比——上一条不能变成放水的后门。"""
+    baseline = _with_rubric(_report(), "v2-要点级")
+    current = _with_rubric(_report(success=0.5), "v2-要点级")
+    findings = {f["metric"]: f for f in report_mod.check_regression_gate(current, baseline)}
+    assert findings["task_success_rate"]["status"] == "dropped"
+
+
 def test_regression_gate_still_fails_a_real_drop_at_same_denominator():
     """分母没动时照常拦跌幅——上一条不能变成放水的后门。"""
     current = _report(success=0.5)

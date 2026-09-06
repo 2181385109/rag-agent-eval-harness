@@ -88,6 +88,7 @@ def build_report(
     agreement: dict | None = None,
     judge_scores: Mapping[str, int] | None = None,
     judge_backfill: dict | None = None,
+    judge_revision: dict | None = None,
     notes: str = "",
 ) -> dict:
     """把轨迹汇总成一份完整报告（纯函数，可在 CI 里用构造轨迹验证）。
@@ -195,6 +196,7 @@ def build_report(
             "ragas": ragas,
             "ragas_baseline": ragas_baseline,
             "agreement": agreement,
+            "judge_revision": judge_revision,
         },
         "tokens": {
             "prompt": prompt_tokens,
@@ -311,9 +313,13 @@ def load_judge_backfill(
         scores[sid] = int(score)
 
     models = sorted({row.get("judge_model") for row in rows if row.get("judge_model")})
+    # 判据版本是任务成功率口径的一部分：同一批答案换一套判据就是换了量尺，
+    # 分数不再与旧分可比（闸 B 据此判 incomparable）。老文件没这个字段，记 None。
+    rubrics = sorted({row.get("rubric_version") for row in rows if row.get("rubric_version")})
     provenance = {
         "source": str(target),
         "judge_model": models[0] if len(models) == 1 else models,
+        "rubric_version": (rubrics[0] if len(rubrics) == 1 else rubrics) or None,
         "open_threshold": config.OPEN_SUCCESS_THRESHOLD,
         "n_rows": len(rows),
         "verified": verified,
@@ -342,6 +348,129 @@ def load_ragas_baseline(path: Path | str) -> dict | None:
         "scored_counts": block.get("scored_counts") or {},
         "n_submitted": block.get("n_submitted"),
     }
+
+
+def build_judge_revision(
+    samples: Sequence[GoldenSample],
+    traces: Mapping[str, AgentTrace],
+    baseline_path: Path | str,
+    current_scores: Mapping[str, int] | None = None,
+) -> dict | None:
+    """裁判判据改前 / 改后的对照块。
+
+    判据一改，**两个指标同时动**：开放题的裁判分既进 kappa，也进任务成功率。
+    只报改后的数字，等于让读者无从判断这个变化是判据带来的还是模型带来的——
+    所以两版都算、都落盘，差值和归因写在旁边。
+
+    输入是同一批轨迹、同一份人工标注，唯一的变量就是那份判据。
+    纯离线：两边的分都是已落盘的，这里不再调任何 API。
+    """
+    from src.eval import judge
+
+    base = Path(baseline_path)
+    if not base.exists():
+        return None
+
+    before_rows = judge.load_judge_rows(base)
+    after_rows = judge.load_judge_rows()
+    before = {r["id"]: int(r["judge_score"]) for r in before_rows if r.get("judge_score") is not None}
+    after = dict(current_scores or judge.load_judge_scores())
+    if not before or not after:
+        return None
+
+    def _version(rows: Sequence[Mapping]) -> str:
+        seen = sorted({r.get("rubric_version") for r in rows if r.get("rubric_version")})
+        # 没标版本的就是加这个字段之前打的分，如实说"未标注"而不是替它编一个。
+        return "、".join(seen) if seen else "未标注（判据版本字段之前）"
+
+    try:
+        human = judge.load_human_labels()
+    except FileNotFoundError:
+        human = {}
+
+    def _success(scores: Mapping[str, int]) -> dict:
+        r = metrics.task_success_rate(samples, traces, judge_scores=scores)
+        return {"value": r.value, "n": r.n, "total": r.total}
+
+    changes = []
+    for sid in sorted(set(before) | set(after)):
+        b, a = before.get(sid), after.get(sid)
+        if b == a:
+            continue
+        row = {"id": sid, "before": b, "after": a}
+        if sid in human:
+            row["human"] = human[sid]
+        changes.append(row)
+
+    block = {
+        "baseline_source": str(base),
+        "rubric_before": _version(before_rows),
+        "rubric_after": _version(after_rows),
+        "n_scored": len(after),
+        "score_changes": changes,
+        "task_success": {"before": _success(before), "after": _success(after)},
+    }
+    if human:
+        block["agreement"] = {
+            "before": judge.agreement_stats(human, before),
+            "after": judge.agreement_stats(human, after),
+        }
+    return block
+
+
+def _render_judge_revision(report: dict) -> list[str]:
+    """把改前 / 改后对照渲染成表。数字全部来自上面那个纯函数，这里只排版。"""
+    block = (report.get("metrics") or {}).get("judge_revision")
+    if not block:
+        return []
+
+    out = [
+        "",
+        "## 裁判判据修订对照（改前 / 改后）",
+        "",
+        f"- 判据：`{block['rubric_before']}` → `{block['rubric_after']}`",
+        f"- 改前的分留档在 `{Path(block['baseline_source']).name}`；"
+        f"轨迹、人工标注、被测模型三者**均未变动**，唯一的变量是判据本身。",
+        "",
+    ]
+
+    sc = block["task_success"]
+    ag = block.get("agreement") or {}
+    rows = [
+        (
+            "任务成功率",
+            sc["before"]["value"],
+            sc["after"]["value"],
+            f"n={sc['after']['n']}/{sc['after']['total']}",
+        )
+    ]
+    if ag:
+        b, a = ag["before"], ag["after"]
+        rows += [
+            ("完全一致率（人↔裁判）", b["exact_agreement"], a["exact_agreement"], f"n={a['n']}"),
+            ("相邻一致率（差 ≤1 档）", b["adjacent_agreement"], a["adjacent_agreement"], f"n={a['n']}"),
+            ("Cohen's kappa（unweighted）", b["kappa"], a["kappa"], f"n={a['n']}"),
+            ("Cohen's kappa（quadratic）", b["kappa_quadratic"], a["kappa_quadratic"], f"n={a['n']}"),
+        ]
+
+    out += ["| 量 | 改前 | 改后 | 差 | 分母 |", "|---|---|---|---|---|"]
+    for label, before, after, denom in rows:
+        delta = "—" if before is None or after is None else f"{after - before:+.3f}"
+        out.append(f"| {label} | {_fmt(before)} | {_fmt(after)} | {delta} | {denom} |")
+
+    changes = block.get("score_changes") or []
+    out += ["", f"### 改判的题（{len(changes)} 道）", ""]
+    if not changes:
+        out.append("无——判据收紧后没有任何一题改档。")
+    else:
+        out += ["| id | 改前 | 改后 | 人工 |", "|---|---|---|---|"]
+        for row in changes:
+            human = row.get("human")
+            out.append(
+                f"| `{row['id']}` | {row['before']} | {row['after']} | "
+                f"{'—' if human is None else human} |"
+            )
+    return out
 
 
 def _fmt(value: float | None) -> str:
@@ -574,6 +703,8 @@ def render_markdown(report: dict) -> str:
         from src.eval.judge import render_agreement_markdown
 
         lines += ["", render_agreement_markdown(agreement).rstrip()]
+
+    lines += _render_judge_revision(report)
 
     anomalies = report.get("anomalies") or []
     if anomalies:
@@ -897,6 +1028,14 @@ def _metric_n(report: Mapping, name: str):
     return None
 
 
+def _metric_rubric(report: Mapping, name: str):
+    """取算这个指标时用的裁判判据版本；不依赖裁判分的指标返回 None。"""
+    item = (report.get("metrics") or {}).get(name)
+    if isinstance(item, Mapping):
+        return ((item.get("backfill") or {}) or {}).get("rubric_version")
+    return None
+
+
 def check_regression_gate(
     current: Mapping,
     baseline: Mapping,
@@ -912,6 +1051,16 @@ def check_regression_gate(
     "36 道全集"时，题数没变、指标名没变，差值却完全来自口径而非模型——
     只看 golden_set_size 会把这种变动当成一次普通波动放过去。
     这是"闸 A 拦口径"在报告层面的对应物。
+
+    **裁判判据换了版本同样不比。** 任务成功率的开放题那一半由裁判分判定，
+    换判据就是换量尺：同一批答案、同一个模型，分数照样会动。
+    判据 v1（结论级）-> v2（要点级）那次，两题掉档、成功率跌 0.056，
+    按容差判会报 dropped，但被测系统一点没变。
+
+    这三条都有同一个代价：**它们也能被用来给一次真实的变差打掩护。**
+    对策不在这个函数里——口径变动必须同时改 fixture 基线（闸 A 逐位比对、涨了也拦）、
+    改 RUBRIC_VERSION 或 config 里的阈值，全都会出现在 diff 和提交历史里。
+    这里的职责只是**不把口径差值伪装成模型差值**，而不是替人把关口径该不该改。
     """
     tol = config.METRIC_DROP_TOLERANCE if tolerance is None else tolerance
     cur_size = (current.get("meta") or {}).get("golden_set_size")
@@ -931,12 +1080,19 @@ def check_regression_gate(
         denominator_moved = (
             old_n is not None and new_n is not None and old_n != new_n
         )
-        if not comparable or denominator_moved:
-            note = (
-                f"黄金集规模不同（{base_size} -> {cur_size}），均值不在同一批题上"
-                if not comparable
-                else f"该指标分母变了（n={old_n} -> n={new_n}），差值来自口径而非模型"
-            )
+        old_rubric, new_rubric = _metric_rubric(baseline, name), _metric_rubric(current, name)
+        rubric_moved = old_rubric != new_rubric
+
+        if not comparable or denominator_moved or rubric_moved:
+            if not comparable:
+                note = f"黄金集规模不同（{base_size} -> {cur_size}），均值不在同一批题上"
+            elif denominator_moved:
+                note = f"该指标分母变了（n={old_n} -> n={new_n}），差值来自口径而非模型"
+            else:
+                note = (
+                    f"裁判判据变了（{old_rubric or '未标注'} -> {new_rubric or '未标注'}），"
+                    "量尺换了，差值不归因于被测系统"
+                )
             findings.append(
                 {
                     "metric": name,
@@ -1070,6 +1226,12 @@ def main(argv: list[str] | None = None) -> int:
         help="裁判打分文件（默认 reports/judge_scores.jsonl），用于回填开放题的任务成功率",
     )
     parser.add_argument(
+        "--compare-judge",
+        type=str,
+        default=None,
+        help="改判据前那份 judge_scores.jsonl 的路径；报告里出改前/改后对照（离线）",
+    )
+    parser.add_argument(
         "--no-judge-backfill",
         action="store_true",
         help="不回填开放题：任务成功率退回只算闭合题（分母会缩小，报告里会写明）",
@@ -1179,6 +1341,23 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print("没有可用的裁判分：开放题不计入任务成功率", file=sys.stderr)
 
+    judge_revision = None
+    if args.compare_judge:
+        judge_revision = build_judge_revision(
+            samples, traces, args.compare_judge, judge_scores
+        )
+        if judge_revision:
+            sc = judge_revision["task_success"]
+            print(
+                f"判据修订对照：{judge_revision['rubric_before']} -> "
+                f"{judge_revision['rubric_after']}，改判 "
+                f"{len(judge_revision['score_changes'])} 题；"
+                f"任务成功率 {sc['before']['value']:.3f} -> {sc['after']['value']:.3f}",
+                file=sys.stderr,
+            )
+        else:
+            print(f"⚠ 对照基线读不到或为空：{args.compare_judge}", file=sys.stderr)
+
     report = build_report(
         samples,
         traces,
@@ -1190,6 +1369,7 @@ def main(argv: list[str] | None = None) -> int:
         agreement=agreement,
         judge_scores=judge_scores,
         judge_backfill=judge_backfill,
+        judge_revision=judge_revision,
         notes=args.notes,
     )
     paths = write_report(
