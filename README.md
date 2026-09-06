@@ -4,6 +4,17 @@
 评测流水线是主角，Agent 是被测对象。模型能力由 **DeepSeek API** 提供，
 语料 / 检索 / 指标 / 测试全部本机运行。
 
+**组件**：
+
+| 层 | 组件 | 作用 |
+|---|---|---|
+| Agent 编排 | LangGraph + LangChain | 显式状态图实现 ReAct 循环（规划→选工具→调工具→观察→回答） |
+| 被测工具 | `retrieve`（RAG 检索）+ `calc`（算术） | 两个工具制造"该用哪个"的判定点，见下方工具调用准确率 |
+| 检索 | FAISS（本地向量库）+ BGE（`bge-large-zh-v1.5`，本地 embedding，不走 API） | 语料在 `corpus/`，切分/索引/检索全在本机 |
+| LLM（被测 + 裁判） | DeepSeek API：被测 `deepseek-chat`，裁判 `deepseek-reasoner`（刻意与被测不同源） | 唯一联网调用，key 从环境变量读 |
+| 评测指标 | 自定义（recall@k / 任务成功率 / 工具调用准确率）+ RAGAS（faithfulness 等）+ LLM-as-Judge + Cohen's kappa | 见下方「## 指标」 |
+| 门禁 | pytest + GitHub Actions（两道离线回归门禁，不调真实 API） | 见「## 回归门禁」 |
+
 完整的范围约束、技术选型与验收口径见 [CLAUDE.md](CLAUDE.md)。
 
 ---
@@ -40,6 +51,7 @@
 | 自动↔人工一致率 kappa（unweighted） | **0.623** | n=10，95% CI [0.231, 1.000] | `report.md` · 自动↔人工一致率 |
 | 自动↔人工一致率 kappa（quadratic） | 0.324 | n=10，95% CI [0.000, 1.000] | 同上；两口径并列，不挑好看的 |
 | 多轮一致性（temp=0 / temp>0） | _（本次快照未含）_ | — | 需 `--consistency-runs`；当前报告走的是 `--from-traces` 复用路径，未重跑一致性子集 |
+| pytest（离线，`-m "not live"`） | **332 passed** | — | 不在 report.md 里，是 `pytest -m "not live"` 的实跑输出——同一条命令可重新数出来 |
 
 **kappa=0.623 必须连带的两条限定**（不许只引用数字本身）：
 
@@ -69,18 +81,31 @@ python -m src.eval.judge --kappa           # 离线算一致率，不花钱
 
 ## 快速开始
 
+**只有 Python 3.12 环境、从零开始复现**，四步：
+
 ```bash
+git clone <本仓库地址> && cd rag-agent-eval-harness
+
 python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt   # Windows
 # source .venv/bin/activate && pip install -r requirements.txt   # Linux/macOS
 
-cp .env.example .env      # 然后填入你自己的 DEEPSEEK_API_KEY
+cp .env.example .env      # 打开 .env，把 DEEPSEEK_API_KEY= 后面填上你自己的 DeepSeek key
 ```
 
-跑测试（**不需要 API key，不发任何网络请求**）：
+> 依赖已在全新虚拟环境验证过一次性可装（无冲突、无警告），`requirements.txt` 里的版本号都是实测锁定值。
+
+第一条跑通命令——不需要 API key，不发任何网络请求，验证代码本身是对的：
 
 ```bash
 pytest -m "not live"
+```
+
+第二条跑通命令——需要上一步配置好的 `DEEPSEEK_API_KEY`，跑一次小子集评测（省钱），
+产物落在 **`reports/report.md`**（人看的报告）与 `reports/latest.json`（机器读的快照）：
+
+```bash
+python -m src.eval.report --limit 5 --no-consistency
 ```
 
 真实打通 DeepSeek 的冒烟测试（需要 key，会产生少量费用）：
@@ -212,3 +237,9 @@ benchmark 原题**。理由很直接：公开题目大概率已经进了模型�
 
 Python **3.12**（CLAUDE.md 原文锁 3.11，本机无 3.11，已确认后调整；其余选型不变）。
 依赖锁版本在 `requirements.txt`。
+
+---
+
+## License
+
+[MIT](LICENSE)
