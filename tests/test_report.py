@@ -464,6 +464,103 @@ def test_reuse_ragas_returns_none_when_absent(tmp_path):
     assert report_mod.load_ragas_reuse(empty) is None
 
 
+# ---------------------------------------------------- RAGAS 复用的指纹核验
+def _ragas_baseline(tmp_path, per_question):
+    path = tmp_path / "baseline.json"
+    path.write_text(
+        json.dumps(
+            {
+                "meta": {"timestamp_utc": "2026-09-05T14:25:07+00:00"},
+                "metrics": {
+                    "ragas": {"evaluated_ids": [q["id"] for q in per_question]},
+                },
+                "per_question": per_question,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_verify_ragas_reuse_passes_when_answer_and_retrieval_unchanged(tmp_path):
+    """轨迹真的没变时，核验必须放行——不能为了"谨慎"逢复用就报警。"""
+    baseline = _ragas_baseline(
+        tmp_path,
+        [{"id": "a", "answer": "阈值 0.25", "retrieved_doc_ids": ["d1", "d2"]}],
+    )
+    traces = {"a": make_trace(answer="阈值 0.25", tools=["retrieve"], retrieved=[["d2", "d1"]])}
+    result = report_mod.verify_ragas_reuse(baseline, traces)
+    assert result["all_match"] is True
+    assert result["n_checked"] == 1
+    assert result["mismatched"] == []
+
+
+def test_verify_ragas_reuse_catches_a_changed_answer(tmp_path):
+    """答案变了，复用前提就不成立——这是这个函数存在的全部意义。"""
+    baseline = _ragas_baseline(
+        tmp_path, [{"id": "a", "answer": "阈值 0.25", "retrieved_doc_ids": ["d1"]}]
+    )
+    traces = {"a": make_trace(answer="阈值 0.3", tools=["retrieve"], retrieved=[["d1"]])}
+    result = report_mod.verify_ragas_reuse(baseline, traces)
+    assert result["all_match"] is False
+    assert result["mismatched"] == ["a"]
+
+
+def test_verify_ragas_reuse_catches_a_changed_retrieval_with_same_answer():
+    """答案文本恰好没变，但检索结果变了——RAGAS 吃到的 context 照样不同，必须拦。"""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        from pathlib import Path
+
+        baseline = _ragas_baseline(
+            Path(td), [{"id": "a", "answer": "同一句话", "retrieved_doc_ids": ["d1"]}]
+        )
+        traces = {"a": make_trace(answer="同一句话", tools=["retrieve"], retrieved=[["d9"]])}
+        result = report_mod.verify_ragas_reuse(baseline, traces)
+        assert result["all_match"] is False
+
+
+def test_verify_ragas_reuse_flags_missing_trace_as_mismatch(tmp_path):
+    """基线里有这道题但当前轨迹没有——缺失不能悄悄跳过，必须算不一致。"""
+    baseline = _ragas_baseline(
+        tmp_path, [{"id": "a", "answer": "x", "retrieved_doc_ids": []}]
+    )
+    result = report_mod.verify_ragas_reuse(baseline, {})
+    assert result["all_match"] is False
+    assert result["mismatched"] == ["a"]
+
+
+def test_reused_ragas_reports_verified_when_fingerprints_match(tmp_path):
+    """核验通过时，报告正文要说"已验证"，不能还停在"前提是轨迹未变"那句猜测。"""
+    baseline = _ragas_baseline(
+        tmp_path, [{"id": "q1", "answer": "答案", "retrieved_doc_ids": ["d1"]}]
+    )
+    traces = {"q1": make_trace(answer="答案", tools=["retrieve"], retrieved=[["d1"]])}
+    block = report_mod.load_ragas_reuse(baseline)
+    block["reuse_verification"] = report_mod.verify_ragas_reuse(baseline, traces)
+
+    rep = report_mod.build_report([make_sample(id="q1")], traces, ragas=block)
+    text = report_mod.render_markdown(rep)
+    assert "已验证轨迹指纹一致" in text
+    assert "前提是轨迹未变（未机器核验）" not in text
+
+
+def test_reused_ragas_reports_unverified_when_fingerprints_mismatch(tmp_path):
+    """核验没过就必须显著标红，绝不能悄悄放行一份对不上的复用分。"""
+    baseline = _ragas_baseline(
+        tmp_path, [{"id": "q1", "answer": "答案", "retrieved_doc_ids": ["d1"]}]
+    )
+    traces = {"q1": make_trace(answer="改过的答案", tools=["retrieve"], retrieved=[["d1"]])}
+    block = report_mod.load_ragas_reuse(baseline)
+    block["reuse_verification"] = report_mod.verify_ragas_reuse(baseline, traces)
+
+    rep = report_mod.build_report([make_sample(id="q1")], traces, ragas=block)
+    text = report_mod.render_markdown(rep)
+    assert "轨迹指纹核验未通过" in text and "不应采用" in text
+
+
 def test_reuse_marker_points_at_the_stable_snapshot(tmp_path):
     """复用标记必须指向当初算出这批数的那次**快照**，不是 latest.json。
 

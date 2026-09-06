@@ -219,6 +219,65 @@ def snapshot_filename(timestamp_utc: str) -> str:
     return f"eval_{stamp}.json"
 
 
+def verify_ragas_reuse(
+    path: Path | str, traces: Mapping[str, AgentTrace]
+) -> dict:
+    """核验"复用 RAGAS 前提轨迹未变"这句话，而不是嘴上说说。
+
+    RAGAS 的输入是 question/answer/contexts。question 由同一份 golden set 决定
+    （文件没变就不会变），contexts 由 doc_id 经同一份 corpus/index 确定性求出
+    （corpus 自 M2 后未再改动，见 git log -- corpus/）——所以只需比对
+    **answer 文本 + retrieved_doc_ids 集合**：两者都对得上，answer 与它引用的
+    doc_id 集合都没变，contexts 就必然没变，不必去重新拼原文比对。
+
+    指纹口径与 judge.answer_fingerprint 一致（sha1 前 12 位），
+    但输入多了 retrieved_doc_ids——只比对答案文本不够，同一个答案配上
+    不同的检索结果，RAGAS 实际吃到的 context 照样变了。
+
+    对照的一侧是**基线快照的 per_question 段**（那次真实运行落盘的答案与
+    检索结果），另一侧是**当前驱动本次报告的 traces**，不是重新跑一次 Agent——
+    纯离线，不产生任何 API 调用。
+    """
+    from src.eval import judge
+
+    baseline = json.loads(Path(path).read_text(encoding="utf-8"))
+    ragas_block = (baseline.get("metrics") or {}).get("ragas") or {}
+    evaluated_ids = ragas_block.get("evaluated_ids") or []
+    by_id = {q["id"]: q for q in baseline.get("per_question", [])}
+
+    def _fp(answer, doc_ids) -> str:
+        payload = (answer or "") + "||" + ",".join(sorted(doc_ids or []))
+        return judge.answer_fingerprint(payload)
+
+    rows = []
+    all_match = bool(evaluated_ids)
+    for sid in evaluated_ids:
+        base_row = by_id.get(sid)
+        trace = traces.get(sid)
+        if base_row is None or trace is None:
+            rows.append(
+                {"id": sid, "baseline_fp": None, "current_fp": None, "match": False}
+            )
+            all_match = False
+            continue
+        base_fp = _fp(base_row.get("answer"), base_row.get("retrieved_doc_ids"))
+        cur_fp = _fp(trace.answer, trace.retrieved_doc_ids)
+        match = base_fp == cur_fp
+        all_match = all_match and match
+        rows.append(
+            {"id": sid, "baseline_fp": base_fp, "current_fp": cur_fp, "match": match}
+        )
+
+    return {
+        "baseline_source": str(path),
+        "baseline_timestamp": (baseline.get("meta") or {}).get("timestamp_utc"),
+        "n_checked": len(rows),
+        "all_match": all_match,
+        "mismatched": [r["id"] for r in rows if not r["match"]],
+        "rows": rows,
+    }
+
+
 def load_ragas_reuse(path: Path | str) -> dict | None:
     """从上一份报告里**原样取回** RAGAS 段。
 
@@ -618,10 +677,26 @@ def render_markdown(report: dict) -> str:
             f"- 裁判模型：`{rg.get('judge_model')}`；embedding：`{rg.get('embedding_model')}`（本地，不外发）",
         ]
         if rg.get("reused_from"):
-            lines.append(
-                f"- ⚠ **本节为复用，不是本次重算**：分数原样取自 `{rg['reused_from']}`"
-                f"（{rg.get('reused_from_timestamp')}），前提是轨迹未变。"
-            )
+            verification = rg.get("reuse_verification")
+            if verification and verification.get("all_match"):
+                lines.append(
+                    f"- ✅ **已验证轨迹指纹一致（{verification['n_checked']} 条），复用成立**："
+                    f"分数原样取自 `{rg['reused_from']}`（{rg.get('reused_from_timestamp')}）。"
+                    "核验口径：answer 文本 + retrieved_doc_ids 集合的指纹逐题比对"
+                    "（corpus 自 M2 后未再变动，doc_id 相同即 context 必然相同）。"
+                )
+            elif verification:
+                lines.append(
+                    f"- ⚠ **轨迹指纹核验未通过**（{len(verification['mismatched'])}/"
+                    f"{verification['n_checked']} 条不一致：{verification['mismatched']}）："
+                    f"分数取自 `{rg['reused_from']}`，但复用前提不成立，这份分数**不应采用**，"
+                    "需要对当前轨迹重跑 RAGAS。"
+                )
+            else:
+                lines.append(
+                    f"- ⚠ **本节为复用，不是本次重算**：分数原样取自 `{rg['reused_from']}`"
+                    f"（{rg.get('reused_from_timestamp')}），前提是轨迹未变（未机器核验）。"
+                )
         lines += [
             f"- 提交评测：**{rg.get('n_submitted')}/{rg.get('total')}** 条"
             f"（排除 {rg.get('n_excluded')} 条：无答案或无检索内容，见下节）",
@@ -1308,7 +1383,27 @@ def main(argv: list[str] | None = None) -> int:
     if ragas_result is None and args.reuse_ragas:
         ragas_result = load_ragas_reuse(args.reuse_ragas)
         if ragas_result:
-            print(f"复用 RAGAS 段：{args.reuse_ragas}（未重算）", file=sys.stderr)
+            verification = verify_ragas_reuse(args.reuse_ragas, traces)
+            ragas_result["reuse_verification"] = verification
+            status = "一致" if verification["all_match"] else "不一致"
+            print(
+                f"复用 RAGAS 段：{args.reuse_ragas}（未重算；轨迹指纹核验：{status}，"
+                f"n={verification['n_checked']}）",
+                file=sys.stderr,
+            )
+            for row in verification["rows"]:
+                mark = "OK" if row["match"] else "DIFF"
+                print(
+                    f"  {row['id']:10s} base={row['baseline_fp']} "
+                    f"current={row['current_fp']}  {mark}",
+                    file=sys.stderr,
+                )
+            if not verification["all_match"]:
+                print(
+                    "  ⚠ 指纹对不上，复用前提不成立——按规则应改为重算 RAGAS，"
+                    "不能带着这份复用分继续。",
+                    file=sys.stderr,
+                )
 
     ragas_baseline = load_ragas_baseline(args.compare_ragas) if args.compare_ragas else None
     if ragas_baseline:
