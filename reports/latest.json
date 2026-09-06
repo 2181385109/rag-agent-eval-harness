@@ -1,7 +1,7 @@
 {
   "meta": {
-    "timestamp_utc": "2026-09-06T08:43:27+00:00",
-    "git_commit": "5521864",
+    "timestamp_utc": "2026-09-06T09:28:35+00:00",
+    "git_commit": "65bf140",
     "model": "deepseek-chat",
     "embedding_model": "BAAI/bge-large-zh-v1.5",
     "use_query_instruction": true,
@@ -11,7 +11,7 @@
     "max_agent_steps": 6,
     "temperature": 0.0,
     "golden_set_size": 36,
-    "notes": "裁判判据 v1 结论级 -> v2 要点级，重跑裁判；改前改后两版留档对照。轨迹与人工标注未变动"
+    "notes": "裁判判据 v1 结论级 -> v2 要点级，重跑裁判；改前改后两版留档对照。RAGAS 复用前提经指纹核验通过（35/35）。轨迹与人工标注未变动"
   },
   "metrics": {
     "recall_at_k": {
@@ -373,7 +373,226 @@
         }
       ],
       "reused_from": "reports\\eval_20260905T142507Z.json",
-      "reused_from_timestamp": "2026-09-05T14:25:07+00:00"
+      "reused_from_timestamp": "2026-09-05T14:25:07+00:00",
+      "reuse_verification": {
+        "baseline_source": "reports/eval_20260905T142507Z.json",
+        "baseline_timestamp": "2026-09-05T14:25:07+00:00",
+        "n_checked": 35,
+        "all_match": true,
+        "mismatched": [],
+        "rows": [
+          {
+            "id": "cap_001",
+            "baseline_fp": "65f6be235448",
+            "current_fp": "65f6be235448",
+            "match": true
+          },
+          {
+            "id": "cap_002",
+            "baseline_fp": "a66c1e9bbada",
+            "current_fp": "a66c1e9bbada",
+            "match": true
+          },
+          {
+            "id": "cap_003",
+            "baseline_fp": "5fd0d1d7bece",
+            "current_fp": "5fd0d1d7bece",
+            "match": true
+          },
+          {
+            "id": "cap_004",
+            "baseline_fp": "946768640bb4",
+            "current_fp": "946768640bb4",
+            "match": true
+          },
+          {
+            "id": "cap_005",
+            "baseline_fp": "91b08949cade",
+            "current_fp": "91b08949cade",
+            "match": true
+          },
+          {
+            "id": "cap_006",
+            "baseline_fp": "eafa385e47c7",
+            "current_fp": "eafa385e47c7",
+            "match": true
+          },
+          {
+            "id": "cap_007",
+            "baseline_fp": "1aca08f535f9",
+            "current_fp": "1aca08f535f9",
+            "match": true
+          },
+          {
+            "id": "cap_008",
+            "baseline_fp": "fad7b520352f",
+            "current_fp": "fad7b520352f",
+            "match": true
+          },
+          {
+            "id": "cap_010",
+            "baseline_fp": "f8949e0fa0b4",
+            "current_fp": "f8949e0fa0b4",
+            "match": true
+          },
+          {
+            "id": "cap_011",
+            "baseline_fp": "18ab02a25a4a",
+            "current_fp": "18ab02a25a4a",
+            "match": true
+          },
+          {
+            "id": "cap_012",
+            "baseline_fp": "cb38f92761b1",
+            "current_fp": "cb38f92761b1",
+            "match": true
+          },
+          {
+            "id": "cap_013",
+            "baseline_fp": "2afab3bb1588",
+            "current_fp": "2afab3bb1588",
+            "match": true
+          },
+          {
+            "id": "cap_014",
+            "baseline_fp": "d747e32ff259",
+            "current_fp": "d747e32ff259",
+            "match": true
+          },
+          {
+            "id": "cap_015",
+            "baseline_fp": "9635d9e013e7",
+            "current_fp": "9635d9e013e7",
+            "match": true
+          },
+          {
+            "id": "cap_016",
+            "baseline_fp": "dd42680b6c2b",
+            "current_fp": "dd42680b6c2b",
+            "match": true
+          },
+          {
+            "id": "cap_017",
+            "baseline_fp": "c79d7512b459",
+            "current_fp": "c79d7512b459",
+            "match": true
+          },
+          {
+            "id": "cap_018",
+            "baseline_fp": "271deb67e7ca",
+            "current_fp": "271deb67e7ca",
+            "match": true
+          },
+          {
+            "id": "cap_019",
+            "baseline_fp": "b673370f7486",
+            "current_fp": "b673370f7486",
+            "match": true
+          },
+          {
+            "id": "cap_020",
+            "baseline_fp": "8d6a124dd600",
+            "current_fp": "8d6a124dd600",
+            "match": true
+          },
+          {
+            "id": "cap_021",
+            "baseline_fp": "410476997443",
+            "current_fp": "410476997443",
+            "match": true
+          },
+          {
+            "id": "cap_022",
+            "baseline_fp": "e120ec657cb2",
+            "current_fp": "e120ec657cb2",
+            "match": true
+          },
+          {
+            "id": "cap_023",
+            "baseline_fp": "4e88a424fc62",
+            "current_fp": "4e88a424fc62",
+            "match": true
+          },
+          {
+            "id": "cap_024",
+            "baseline_fp": "46051d3e7534",
+            "current_fp": "46051d3e7534",
+            "match": true
+          },
+          {
+            "id": "cap_025",
+            "baseline_fp": "97fb5f68b7a5",
+            "current_fp": "97fb5f68b7a5",
+            "match": true
+          },
+          {
+            "id": "cap_026",
+            "baseline_fp": "95d712d37b2c",
+            "current_fp": "95d712d37b2c",
+            "match": true
+          },
+          {
+            "id": "cap_027",
+            "baseline_fp": "ee55aab39c7f",
+            "current_fp": "ee55aab39c7f",
+            "match": true
+          },
+          {
+            "id": "cap_028",
+            "baseline_fp": "ff6a3814fd15",
+            "current_fp": "ff6a3814fd15",
+            "match": true
+          },
+          {
+            "id": "cap_029",
+            "baseline_fp": "891d1b1c4791",
+            "current_fp": "891d1b1c4791",
+            "match": true
+          },
+          {
+            "id": "cap_030",
+            "baseline_fp": "349f9249dfaf",
+            "current_fp": "349f9249dfaf",
+            "match": true
+          },
+          {
+            "id": "cap_031",
+            "baseline_fp": "5ba0aac4abb1",
+            "current_fp": "5ba0aac4abb1",
+            "match": true
+          },
+          {
+            "id": "cap_032",
+            "baseline_fp": "aa5ae7ebf64a",
+            "current_fp": "aa5ae7ebf64a",
+            "match": true
+          },
+          {
+            "id": "cap_033",
+            "baseline_fp": "46fc7e6d96ef",
+            "current_fp": "46fc7e6d96ef",
+            "match": true
+          },
+          {
+            "id": "cap_034",
+            "baseline_fp": "a691ecabdf67",
+            "current_fp": "a691ecabdf67",
+            "match": true
+          },
+          {
+            "id": "cap_035",
+            "baseline_fp": "8c2a8df211d5",
+            "current_fp": "8c2a8df211d5",
+            "match": true
+          },
+          {
+            "id": "cap_036",
+            "baseline_fp": "9c54dae21468",
+            "current_fp": "9c54dae21468",
+            "match": true
+          }
+        ]
+      }
     },
     "ragas_baseline": null,
     "agreement": {

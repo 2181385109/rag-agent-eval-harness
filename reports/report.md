@@ -1,7 +1,7 @@
 # 评测报告
 
-- 时间（UTC）：2026-09-06T08:43:27+00:00
-- git commit：`5521864`
+- 时间（UTC）：2026-09-06T09:28:35+00:00
+- git commit：`65bf140`
 - 被测模型：`deepseek-chat`（temperature=0.0）
 - Embedding：`BAAI/bge-large-zh-v1.5`（查询指令前缀=True）
 - 检索 top-k：4；切分 500/80
@@ -31,7 +31,7 @@
 ## RAGAS（生成质量）
 
 - 裁判模型：`deepseek-reasoner`；embedding：`BAAI/bge-large-zh-v1.5`（本地，不外发）
-- ⚠ **本节为复用，不是本次重算**：分数原样取自 `reports\eval_20260905T142507Z.json`（2026-09-05T14:25:07+00:00），前提是轨迹未变。
+- ✅ **已验证轨迹指纹一致（35 条），复用成立**：分数原样取自 `reports\eval_20260905T142507Z.json`（2026-09-05T14:25:07+00:00）。核验口径：answer 文本 + retrieved_doc_ids 集合的指纹逐题比对（corpus 自 M2 后未再变动，doc_id 相同即 context 必然相同）。
 - 提交评测：**35/36** 条（排除 1 条：无答案或无检索内容，见下节）
 
 | 指标 | 值 | 实际打分行数 |
