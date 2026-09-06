@@ -32,10 +32,11 @@ b0aec2d  feat(eval): LLM-as-Judge 打分与自动↔人工一致率（kappa）
 
 ## 二、当前真实指标（全部可复现，不许改动数字）
 
-出处：[reports/report.md](reports/report.md)，对应快照 `reports/eval_20260906T084327Z.json`。
+出处：[reports/report.md](reports/report.md)，对应快照 `reports/eval_20260906T092835Z.json`
+（commit `65bf140` 生成，git_commit 字段与生成它的代码所在提交逐位一致，已核对）。
 轨迹是同一份 `reports/traces_latest.jsonl`（2026-09-06T03:38 那次真实运行），
-之后的两次报告都是 `--from-traces` 重算，没有重跑过 Agent——
-所以除任务成功率外的数字与上一份快照逐位相同。
+之后的报告都是 `--from-traces` 重算，没有重跑过 Agent——
+所以除任务成功率、RAGAS 复用标记外的数字与上一份快照逐位相同。
 
 | 指标 | 值 | 分母 / 必须连带说明的限定 |
 |---|---|---|
@@ -54,7 +55,10 @@ b0aec2d  feat(eval): LLM-as-Judge 打分与自动↔人工一致率（kappa）
 | Cohen's kappa（quadratic） | 0.324 | n=10，95% CI [0.000, 1.000] |
 
 RAGAS 那一段在最新报告里是**复用**的（`--reuse-ragas`，同一批轨迹省 40 分钟），
-报告里已打「本节为复用，不是本次重算」标记并指向 `eval_20260905T142507Z.json`。
+且复用前提已**机器核验**（不再是口头断言）：`report.verify_ragas_reuse` 对基线快照
+`eval_20260905T142507Z.json` 的 per_question（answer + retrieved_doc_ids）与当前
+`traces_latest.jsonl` 逐题算指纹比对，**35/35 条一致**。报告里相应从
+「⚠ 前提是轨迹未变」改成了「✅ 已验证轨迹指纹一致（35 条），复用成立」。
 
 ---
 
@@ -169,4 +173,7 @@ python -m src.eval.report --from-traces reports/traces_latest.jsonl --no-judge-b
 - **kappa 退化情形打印「未定义」，绝不落成 0.0**。
 - **标注纪律**：改 `expected_doc_ids` 只能依据 `data/annotation_criteria.md` 的书面判据，
   不许看着检索结果反推；确需修订就对全部题目重扫一遍并在报告里写明差值与归因。
-- **README 与简历 bullet 的指标区仍是占位**，等上面三个待决拍板后一次性填真值。
+- **README 与简历 bullet 的指标区已填真值**（2026-09-06）。CLAUDE.md §12 与 README
+  「## 指标」都已按 `reports/eval_20260906T092835Z.json` 填入，且逐项标注了对应
+  report.md 的哪一节——多轮一致性那格**照实留白**（当前快照未含一致性重跑），
+  没有为了填满表格去凑一个不在这份快照里的数字。

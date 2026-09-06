@@ -23,21 +23,36 @@
 
 ## 指标
 
-> **📌 待填。** 本节的数字等门禁跑通、全量重跑一次后再一次性填入真值。
-> 在那之前请直接看 **[reports/report.md](reports/report.md)**——那是自动生成的，
-> 每个数字都带分母、带 git commit、带模型与检索参数。
+以下数字全部取自 [reports/report.md](reports/report.md)（commit `65bf140` 生成，
+快照 `reports/eval_20260906T092835Z.json`），可用下面「复现全量评测」里的命令重新跑出来。
 
-| 指标 | 值 | 出处 |
-|---|---|---|
-| 检索召回率 recall@k | _（见报告）_ | `reports/report.md` · 指标 |
-| 任务成功率 | _（见报告）_ | 同上 |
-| 工具调用准确率 | _（见报告）_ | 同上 |
-| 多轮一致性（temp=0 / temp>0） | _（见报告）_ | `reports/report.md` · 多轮一致性 |
-| faithfulness / answer_relevancy / context_precision / context_recall | _（见报告）_ | `reports/report.md` · RAGAS |
-| 自动↔人工一致率 kappa | _（见报告）_ | `reports/report.md` · 自动↔人工一致率 |
+| 指标 | 值 | 分母 | 出处 |
+|---|---|---|---|
+| 黄金集规模 | 36 条 | 闭合 26 / 开放 10 | `report.md` 表头 |
+| 检索召回率 recall@4（并集） | **0.968** | n=31/36 | `report.md` · 指标 |
+| recall@4（仅首次检索） | **0.774** | n=31/36 | 同上；差值＝多次检索捞回的部分 |
+| 任务成功率 | **0.917** | n=36/36 | `report.md` · 任务成功率的判定口径 |
+| 工具调用准确率（严格/宽松） | **0.944** | n=36/36 | `report.md` · 指标；两口径相同 |
+| faithfulness | **0.862** | n=35/35 | `report.md` · RAGAS（复用前提已机器指纹核验，35/35 一致） |
+| answer_relevancy | **0.826** | n=35/35 | 同上 |
+| context_recall | **0.824** | n=35/35 | 同上 |
+| context_precision | **0.670** | n=35/35 | 同上 |
+| 自动↔人工一致率 kappa（unweighted） | **0.623** | n=10，95% CI [0.231, 1.000] | `report.md` · 自动↔人工一致率 |
+| 自动↔人工一致率 kappa（quadratic） | 0.324 | n=10，95% CI [0.000, 1.000] | 同上；两口径并列，不挑好看的 |
+| 多轮一致性（temp=0 / temp>0） | _（本次快照未含）_ | — | 需 `--consistency-runs`；当前报告走的是 `--from-traces` 复用路径，未重跑一致性子集 |
+
+**kappa=0.623 必须连带的两条限定**（不许只引用数字本身）：
+
+1. 这是**判据修订后**的结果（v1 结论级 0.216 → v2 要点级 0.623）。上升有相当一部分是
+   构造性的——v2 本质是让自动裁判去复现人工标注本来就在用的要点级口径，
+   不是两个独立评分者自发趋同；真正的独立一致性需要人工在 v2 判据下重新盲标，本轮未做。
+2. n=10，95% CI 上界顶到 1.0，区间的收窄程度配不上点估计的涨幅，不构成硬结论。
+
+完整过程见 [CLAUDE.md](CLAUDE.md) §6 修订记录与 [data/agreement_interpretation.md](data/agreement_interpretation.md)。
 
 **第一红线是「禁止编造任何指标」**：README 与简历里出现的每个数字，
 都必须能由仓库里的一条命令重新跑出来。填不出来就说明那块还没做完，不许提前填。
+多轮一致性那格留白正是这条红线的体现——没有当前快照支持的数字，宁可空着也不编。
 
 复现全量评测（需要 `DEEPSEEK_API_KEY`，会产生费用）：
 
