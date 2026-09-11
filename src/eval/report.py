@@ -1219,23 +1219,32 @@ def run_gates() -> int:
     print()
     if not latest.exists():
         print("闸 B（回归闸）：跳过——还没有 latest.json")
-        return 1 if failed else 0
+    else:
+        current_report = json.loads(latest.read_text(encoding="utf-8"))
+        prev_name = snapshot_filename(current_report["meta"]["timestamp_utc"])
+        previous = find_previous_snapshot(current=config.REPORTS_DIR / prev_name)
+        if previous is None:
+            print("闸 B（回归闸）：跳过——除本次外没有可比的历史快照")
+        else:
+            baseline_report = json.loads(previous.read_text(encoding="utf-8"))
+            print(f"闸 B（回归闸）：latest.json vs {previous.name}，容差 {config.METRIC_DROP_TOLERANCE}")
+            for f in check_regression_gate(current_report, baseline_report):
+                if f["status"] == "dropped":
+                    failed = True
+                delta = f.get("delta")
+                shown = f"{delta:+.4f}" if isinstance(delta, float) else "—"
+                print(f"  {f['status']:12} {f['metric']}: {f.get('baseline')} -> {f.get('current')}  ({shown})")
 
-    current_report = json.loads(latest.read_text(encoding="utf-8"))
-    prev_name = snapshot_filename(current_report["meta"]["timestamp_utc"])
-    previous = find_previous_snapshot(current=config.REPORTS_DIR / prev_name)
-    if previous is None:
-        print("闸 B（回归闸）：跳过——除本次外没有可比的历史快照")
-        return 1 if failed else 0
+    # 闸 C（稳定性闸，PERF_SPEC B4）：同一输入重复 k 次的成功率标准差与轨迹自洽率，
+    # 外加"summary.json 的数字必须能由原始产物重算出来"。逻辑在 stability/gate.py。
+    from stability import gate as stability_gate
 
-    baseline_report = json.loads(previous.read_text(encoding="utf-8"))
-    print(f"闸 B（回归闸）：latest.json vs {previous.name}，容差 {config.METRIC_DROP_TOLERANCE}")
-    for f in check_regression_gate(current_report, baseline_report):
-        if f["status"] == "dropped":
-            failed = True
-        delta = f.get("delta")
-        shown = f"{delta:+.4f}" if isinstance(delta, float) else "—"
-        print(f"  {f['status']:12} {f['metric']}: {f.get('baseline')} -> {f.get('current')}  ({shown})")
+    print()
+    gate_c_ok, lines = stability_gate.run_gate_c()
+    for line in lines:
+        print(line)
+    if not gate_c_ok:
+        failed = True
 
     print()
     print("门禁结果：" + ("FAIL" if failed else "PASS"))

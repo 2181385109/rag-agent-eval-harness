@@ -96,3 +96,6 @@ index/
 .idea/
 .DS_Store
 Thumbs.db
+
+# ---- stability/ 的进度日志（内容已在 run_*.jsonl 里）----
+stability/raw/_*.log

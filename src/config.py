@@ -111,6 +111,23 @@ CONSISTENCY_TEMPERATURE = 0.7
 METRIC_DROP_TOLERANCE = 0.05
 GATED_METRICS = ("task_success_rate", "tool_accuracy", "faithfulness")
 
+# ------------------------------------------ 闸 C：稳定性门禁（PERF_SPEC §3 B4）
+# 同一输入重复 k 次（temperature=0）：
+#   - 任务成功率跨 k 次的样本标准差 > 0.05 -> fail
+#   - 轨迹自洽率（k 次工具序列逐项一致的题占比）< 阈值 -> fail（规格提议 0.8，实际取值见下）
+# 定阈值的规则（2026-09-12 与项目负责人拍板，**在看到全量数字之前**定下，避免事后挑数）：
+#   - 成功率标准差：直接取 PERF_SPEC 给定的 0.05。
+#   - 轨迹自洽率：门禁盯**严格口径**（序列逐项相等，规格原意）。PERF_SPEC 同时写了
+#     「< 0.8 fail」与「阈值首次由本次测量结果确定」，而 5 题试点的严格口径只有 0.40，
+#     0.8 在这个 Agent 上不可达。故阈值 = 首次全量实测值 − 0.05（与闸 B 同一容差），
+#     一次性写死，之后**不许再调低**（PERF_SPEC §1 铁律）；0.8 未达标这一事实记在
+#     LIMITATIONS.md。试点 -> 全量的数字变化只来自样本，不来自口径。
+STABILITY_RUNS = 5
+STABILITY_MAX_SUCCESS_RATE_STD = 0.05
+# 首次全量实测（2026-09-11，stability/raw/run_20260911T162531Z.jsonl，n=36×5）：严格口径 28/36 = 0.7778。
+# 0.7778 − 0.05 = 0.7278，向下取三位 -> 0.727。自此冻结。
+STABILITY_MIN_TRAJECTORY_CONSISTENCY = 0.727
+
 
 def get_api_key() -> str:
     """取 DeepSeek API key；缺失时明确报错，绝不静默降级。"""
