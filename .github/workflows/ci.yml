@@ -27,7 +27,9 @@ jobs:
         run: pytest -m "not live"
 
       - name: Metric regression gate
-        # 两道闸，都离线（CLAUDE.md §7）：
+        # 三道闸，都离线（CLAUDE.md §7；闸 C 见 PERF_SPEC 任务 B）：
+        #   闸 C 稳定性闸——stability/summary.json 的成功率跨次标准差与轨迹自洽率过阈值，
+        #        且除答案相似度外的每个数字都能由 stability/raw/ 重算出来、逐位相等。
         #   闸 A 口径闸——tests/fixtures 里的冻结子集重算指标，与 reports/gate_baseline.json
         #        逐位比对。输入没变数字却变了，只可能是指标口径被改动，涨跌都拦。
         #   闸 B 回归闸——reports/latest.json 与上一份快照比，关键指标

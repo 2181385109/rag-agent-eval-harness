@@ -220,3 +220,69 @@ python -m src.eval.report --from-traces reports/traces_latest.jsonl --no-judge-b
   「## 指标」都已按 `reports/eval_20260906T092835Z.json` 填入，且逐项标注了对应
   report.md 的哪一节——多轮一致性那格**照实留白**（当前快照未含一致性重跑），
   没有为了填满表格去凑一个不在这份快照里的数字。
+
+---
+
+## 六、PERF_SPEC 任务 B 交接（2026-09-12）：延迟分解 + 稳定性 + 闸 C
+
+规格：`D:\PERF_SPEC.md` §3（仓库外）。本节按它 §5.2 的要求写：改了什么、产物在哪、
+阈值怎么定的、下次从哪接。
+
+### 改了什么
+
+- 新增 `stability/` 包（规格指定的目录，不在 `src/` 下）：
+  `run_repeat.py`（每题 k 次，逐行落盘，pass-major 顺序，预热排除 BGE 懒加载）、
+  `instrument.py`（给 `llm.chat_completion` 与 `ToolBox.run` 挂计时探针，不改 Agent 代码）、
+  `records.py`（一行一次运行的 pydantic schema）、`judge_runs.py`（开放题逐次裁判，复用
+  `src/eval/judge` 的 reasoner + v2 判据）、`analyze.py`（raw -> summary.json + report.md）、
+  `gate.py`（闸 C）、`__main__.py`（`python -m stability` = `make stability`）。
+- `src/eval/report.run_gates` 接入闸 C；`src/config.py` 新增 `STABILITY_*` 三个常量。
+- 新增 `tests/test_stability_analyze.py`（指标口径）与 `tests/test_stability_gate.py`（闸 C），
+  `pytest -m "not live"` 由 332 → **364** 项。
+- 新增 `LIMITATIONS.md`、`Makefile`；README 加了「闸 C」一节（不手抄数字）；CI 注释同步。
+
+### 产物在哪（全部进 git，永不覆盖；文件名带时间戳）
+
+| 文件 | 内容 |
+|---|---|
+| `stability/raw/run_20260911T161706Z.jsonl` + `.meta.json` | **试点**：5 题（cap_001/006/007/033/035）× 5，25 行 |
+| `stability/raw/judge_20260911T162111Z.jsonl` | 试点开放题逐次裁判分，10 行 |
+| `stability/raw/run_20260911T162531Z.jsonl` + `.meta.json` | **全量**：36 题 × 5，180 行，0 报错 |
+| `stability/raw/judge_20260911T163709Z.jsonl` | 全量开放题逐次裁判分，50 行 |
+| `stability/summary.json` / `stability/report.md` | 由全量 run + judge 生成；闸 C 读它 |
+| `stability/pilot_20260911_report.md` | 试点的报告（同一脚本生成，改名留档） |
+
+试点的运行记录按规格保留、不删；它不是 summary 的来源。
+
+### 阈值怎么定的（先定规则、后看数字）
+
+- `STABILITY_MAX_SUCCESS_RATE_STD = 0.05`：规格给定值，实测通过。
+- `STABILITY_MIN_TRAJECTORY_CONSISTENCY = 0.727`：规格提议 0.8，试点严格口径只有 0.40，
+  与项目负责人在看到全量数字**之前**拍板：门禁盯严格口径，阈值 = 首次全量实测值 − 0.05
+  （与闸 B 同一容差），一次性冻结。全量实测 0.7778 → 0.727。**规格的 0.8 未达标**，
+  记在 LIMITATIONS.md 第 1 条；自此不许再调低。
+- 判定自洽率、答案相似度不设门禁（规格只要求两条）。
+
+### 本次测出来的三件事（数字看 stability/report.md，这里只说结论）
+
+1. **temperature=0 不确定**：不一致的 8 题全部是 `retrieve` 调用**次数**在变（1 次 vs 2 次，
+   cap_007 在 4~7 次之间），折叠连续重复后 36/36 一致——工具**选择**从未变过，变的是
+   "要不要再查一次"。轨迹自洽率 < 判定自洽率，即规格 B2 预言的"路径不稳但结果凑对了"。
+2. **被测模型换了后端**：请求 `deepseek-chat`，响应 `model` 字段是 `deepseek-flash`。
+   与 09-06 主评测快照逐题对照（report.md「对照主评测快照」一节，脚本算的）：6 题判定
+   变化，检索逐位相同，差异全在模型侧——模型现在更少发起第二次改写检索。
+   **这是闸 B 该抓的漂移，但闸 B 只比主评测快照；确认需重跑 `python -m src.eval.report`。**
+   本次没跑（规格外、要花钱）——**这是下一步最该做的事**，跑完闸 B 大概率 FAIL，那是正确的。
+3. **延迟几乎全在等 API**：LLM 段占端到端九成以上，本机检索不到一成，编排开销可忽略。
+   优化方向只有减少 LLM 调用次数（那个 "要不要再查一次" 的抖动同时也是延迟与 token 的抖动）。
+
+### 下次从哪接
+
+- [ ] 重跑主评测，让闸 B 对 09-06 快照正式比对（预期 task_success_rate 明显下跌）。
+      若确认是服务端换后端，报告 meta 里没有记录当时的响应 `model` 字段——
+      `AgentTrace.model` 记的是**请求**的模型名；可考虑把 `response_model` 也记进轨迹。
+- [ ] `index/`（09-04 建）早于语料脱敏（09-06）：重建会移动 doc_id，必须先按
+      `data/annotation_criteria.md` 全量重扫 `expected_doc_ids`。在那之前，模型在 cap_035
+      的答案里仍会逐字引用旧路径（本次 raw 里有 5 处，与 §三点五保留的 5 处同性质）。
+- [ ] 推 GitHub 前：仍需先问是否公开 `corpus/`（§一）；本次安全扫描结果见对话记录。
+- [ ] `Makefile` 在本机跑不了（无 make）；Windows 用 `python -m stability`。

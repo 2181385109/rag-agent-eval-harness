@@ -133,10 +133,10 @@ python -m src.eval.report --from-traces reports/traces_latest.jsonl --ragas
 ## 回归门禁（M6）
 
 思路直接搬自信贷风控项目里的 **PSI 触发告警**：定一条基线，指标漂出容差就报警。
-这里落成 CI 的两道闸，**都不调真实 API**（GitHub Actions 上不放 key）：
+这里落成 CI 的三道闸（A/B 见下表，C 见后文），**都不调真实 API**（GitHub Actions 上不放 key）：
 
 ```bash
-python -m src.eval.report --gate     # 本地跑两道闸，等价于 CI 里那一步
+python -m src.eval.report --gate     # 本地跑三道闸（A/B/C），等价于 CI 里那一步
 ```
 
 | | 闸 A · 口径闸 | 闸 B · 回归闸 |
@@ -167,6 +167,35 @@ python -m src.eval.report --gate     # 本地跑两道闸，等价于 CI 里那�
   fixture 基线（闸 A 逐位比对）、`RUBRIC_VERSION` 或 config 阈值，全都会出现在 diff 里。
 - **fixture 不复制 corpus 原文**：门禁只用 `doc_id` 判 recall，把 chunk 全文
   塞进 git 既无必要，也等于把语料再落一份。
+
+### 闸 C · 稳定性闸（同一输入重复 k 次）
+
+主评测每题只跑一次，说明不了"再跑一次还是这个结果吗"。`stability/` 补的就是这一维：
+黄金集每题在 temperature=0 下重复 k=5 次，逐次记录端到端 / 检索 / LLM / 工具四段延迟、
+工具序列、答案与 token 用量（一行一次运行，`stability/raw/run_*.jsonl`），
+开放题再由 deepseek-reasoner 逐次打分（`stability/raw/judge_*.jsonl`），然后离线算：
+
+| 指标 | 口径 |
+|---|---|
+| 延迟分解 | 端到端与各段的 P50/P95/P99（附 n、错误率），各段占比的中位数 |
+| 轨迹自洽率 | k 次工具调用序列**逐项完全一致**的题占比（折叠连续重复的口径并列，只作参考） |
+| 判定自洽率 | k 次任务成功判定全部相同的题占比（闭合题规则、开放题逐次裁判） |
+| 答案相似度 | 同题 k 个答案两两 BGE 余弦相似度，报均值与最小值 |
+| 成本 | 每次运行平均 token、跑完一轮完整评测的 token、服务端缓存命中量（按 pass 拆开） |
+
+闸 C 盯两条：任务成功率跨 k 次的样本标准差 ≤ `STABILITY_MAX_SUCCESS_RATE_STD`，
+轨迹自洽率 ≥ `STABILITY_MIN_TRAJECTORY_CONSISTENCY`（阈值在 `src/config.py`，
+由首次全量实测一次性定下后冻结，**未达标只记录、不调低**）；另有一道**可复现闸**：
+`stability/summary.json` 里除答案相似度外的每个数字，CI 都从 `stability/raw/` 重算并逐位比对。
+
+数字一律看脚本生成的 [stability/report.md](stability/report.md)（本 README 不手抄数字），
+局限看 [LIMITATIONS.md](LIMITATIONS.md)——其中最重要的一条：**temperature=0 不给出确定性输出**，
+自洽率不足 1.0 不是 bug，是结论本身。
+
+```bash
+python -m stability            # = make stability：重复运行 -> 逐次裁判 -> 分析 -> 闸 C（要 key、花钱）
+python -m stability.analyze    # 只重算（离线）；python -m stability.gate 只跑闸 C
+```
 
 ---
 
