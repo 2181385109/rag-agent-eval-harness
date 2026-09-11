@@ -76,7 +76,13 @@ def latest_raw(directory: Path | None = None) -> Path:
 
 
 def sha256_of(path: Path | str) -> str:
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    """文本产物的指纹，**按行结束符归一后**算。
+
+    Windows 上 Python 写出的是 CRLF，git 入库归一成 LF，Linux CI 检出的是 LF——
+    按原始字节算指纹会让同一份产物在 CI 上对不上。归一到 LF 后算，指纹只随内容变。
+    """
+    text = Path(path).read_text(encoding="utf-8").replace("\r\n", "\n")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _relative(path: Path | str | None) -> str | None:

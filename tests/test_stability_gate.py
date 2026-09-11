@@ -163,3 +163,12 @@ def test_run_gates_reports_gate_c(capsys):
     report_mod.run_gates()
     out = capsys.readouterr().out
     assert "闸 C" in out
+
+
+def test_raw_fingerprint_is_line_ending_independent(tmp_path):
+    """CRLF (Windows working copy) and LF (git / Linux CI) must hash identically."""
+    lf = tmp_path / "lf.jsonl"
+    crlf = tmp_path / "crlf.jsonl"
+    lf.write_bytes(b'{"a": 1}\n{"b": 2}\n')
+    crlf.write_bytes(b'{"a": 1}\r\n{"b": 2}\r\n')
+    assert analyze.sha256_of(lf) == analyze.sha256_of(crlf)
