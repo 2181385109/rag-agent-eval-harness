@@ -1,0 +1,1906 @@
+{
+  "meta": {
+    "analyzed_at_utc": "2026-09-11T16:44:13+00:00",
+    "raw_file": "stability/raw/run_20260911T162531Z.jsonl",
+    "raw_sha256": "35373369194c76c97b35a3e6c99e4aaeab5f858afa75123586ba3f1971e1b3e2",
+    "judge_rows_given": true,
+    "judge_file": "stability/raw/judge_20260911T163709Z.jsonl",
+    "judge_sha256": "893bb77acd4fc40849d3e8e0c170574410221443790ab14d267a30f47e07a0c4",
+    "n_rows": 180,
+    "n_questions": 36,
+    "k": 5,
+    "served_models": [
+      "deepseek-flash"
+    ],
+    "system_fingerprints": [
+      "aeb56401ca74e127821c4f9126dcb669"
+    ],
+    "run_meta": {
+      "run_id": "20260911T162531Z",
+      "k": 5,
+      "n_questions": 36,
+      "sample_ids": [
+        "cap_001",
+        "cap_002",
+        "cap_003",
+        "cap_004",
+        "cap_005",
+        "cap_006",
+        "cap_007",
+        "cap_008",
+        "cap_009",
+        "cap_010",
+        "cap_011",
+        "cap_012",
+        "cap_013",
+        "cap_014",
+        "cap_015",
+        "cap_016",
+        "cap_017",
+        "cap_018",
+        "cap_019",
+        "cap_020",
+        "cap_021",
+        "cap_022",
+        "cap_023",
+        "cap_024",
+        "cap_025",
+        "cap_026",
+        "cap_027",
+        "cap_028",
+        "cap_029",
+        "cap_030",
+        "cap_031",
+        "cap_032",
+        "cap_033",
+        "cap_034",
+        "cap_035",
+        "cap_036"
+      ],
+      "ordering": "pass-major（先把所有题跑完第 0 次，再第 1 次……）",
+      "model": "deepseek-chat",
+      "base_url": "https://api.deepseek.com/v1",
+      "temperature": 0.0,
+      "max_tokens": 1024,
+      "request_timeout_s": 60.0,
+      "max_retries": 2,
+      "seed": "none — 本机侧无随机数：FAISS 精确内积搜索、规则判定均确定；唯一随机源是 API 侧解码（已发 temperature=0）",
+      "embedding_model": "BAAI/bge-large-zh-v1.5",
+      "use_query_instruction": true,
+      "retrieve_top_k": 4,
+      "chunk_size": 500,
+      "chunk_overlap": 80,
+      "max_agent_steps": 6,
+      "git_commit": "78b5122",
+      "started_utc": "2026-09-11T16:25:31+00:00",
+      "finished_utc": "2026-09-11T16:33:52+00:00",
+      "interrupted": false,
+      "env": {
+        "cpu": "AMD Ryzen 7 7840H  w/ Radeon 780M Graphics",
+        "cpu_count": 16,
+        "ram_gb": 15.3,
+        "os": "Windows 11 (10.0.26200)",
+        "python": "3.12.3",
+        "openai": "2.54.0",
+        "langgraph": "1.2.11",
+        "sentence_transformers": "6.0.1",
+        "faiss_cpu": "1.15.0",
+        "torch": "2.14.0"
+      },
+      "warmups": [
+        {
+          "retriever_s": 10.960059299999557,
+          "llm_s": 1.9285603999960585,
+          "llm_tokens": 6,
+          "note": "预热不计入任何指标：一次 retrieve 触发 BGE 懒加载，一次 1-token 请求建立 HTTPS 连接"
+        }
+      ],
+      "n_rows": 180
+    }
+  },
+  "latency": {
+    "note": "wall-clock 秒；分位数为 numpy.percentile 线性插值；只统计 error 为空的行",
+    "e2e": {
+      "n": 180,
+      "p50": 2.522050549996493,
+      "p95": 3.7187347649971336,
+      "p99": 6.955044514005861,
+      "mean": 2.6457197611111445,
+      "max": 7.225349500004086
+    },
+    "phases": {
+      "llm": {
+        "n": 180,
+        "p50": 2.2886413499982154,
+        "p95": 3.4376619049959114,
+        "p99": 5.96155183800351,
+        "mean": 2.417642726667044,
+        "max": 6.413959099998465
+      },
+      "retrieve": {
+        "n": 180,
+        "p50": 0.26759929999752785,
+        "p95": 0.3181326150006498,
+        "p99": 0.8245686929868686,
+        "mean": 0.22601160333332598,
+        "max": 1.0158893000043463
+      },
+      "tool": {
+        "n": 180,
+        "p50": 0.0,
+        "p95": 4.885500056843737e-05,
+        "p99": 6.864700160804221e-05,
+        "mean": 7.769999946402903e-06,
+        "max": 0.00041700000292621553
+      },
+      "overhead": {
+        "n": 180,
+        "p50": 0.001939200003107544,
+        "p95": 0.0027969849870714803,
+        "p99": 0.004031182995458954,
+        "mean": 0.002057661110827919,
+        "max": 0.006826899989391677
+      }
+    },
+    "share_median": {
+      "llm": 0.9138343274619285,
+      "retrieve": 0.08557272029361765,
+      "tool": 0.0,
+      "overhead": 0.0007922297525178344
+    },
+    "llm_calls_per_run": {
+      "n": 180,
+      "p50": 2.0,
+      "p95": 3.0,
+      "p99": 4.0,
+      "mean": 2.0722222222222224,
+      "max": 4.0
+    },
+    "single_llm_call": {
+      "n": 373,
+      "p50": 1.0560642999989795,
+      "p95": 2.113605940002889,
+      "p99": 3.0538889120021446,
+      "mean": 1.1666908600538015,
+      "max": 4.010564299998805
+    },
+    "n_total": 180,
+    "n_ok": 180,
+    "n_error": 0,
+    "error_rate": 0.0
+  },
+  "stability": {
+    "trajectory_consistency": {
+      "rule": "k 次运行的工具调用序列逐项完全一致的题占比（不折叠连续重复）",
+      "value": 0.7777777777777778,
+      "collapsed_value": 1.0,
+      "n": 36,
+      "total": 36,
+      "inconsistent_ids": [
+        "cap_001",
+        "cap_002",
+        "cap_007",
+        "cap_010",
+        "cap_013",
+        "cap_022",
+        "cap_035",
+        "cap_036"
+      ],
+      "detail": {
+        "cap_001": {
+          "consistent": false,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_002": {
+          "consistent": false,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_003": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_004": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_005": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_006": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve",
+              "calc"
+            ],
+            [
+              "retrieve",
+              "retrieve",
+              "calc"
+            ],
+            [
+              "retrieve",
+              "retrieve",
+              "calc"
+            ],
+            [
+              "retrieve",
+              "retrieve",
+              "calc"
+            ],
+            [
+              "retrieve",
+              "retrieve",
+              "calc"
+            ]
+          ]
+        },
+        "cap_007": {
+          "consistent": false,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_008": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_009": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ]
+          ]
+        },
+        "cap_010": {
+          "consistent": false,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_011": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_012": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_013": {
+          "consistent": false,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_014": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_015": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_016": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_017": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_018": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_019": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_020": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_021": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_022": {
+          "consistent": false,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_023": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_024": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_025": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_026": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_027": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_028": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_029": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_030": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_031": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_032": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_033": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ]
+          ]
+        },
+        "cap_034": {
+          "consistent": true,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ],
+            [
+              "calc"
+            ]
+          ]
+        },
+        "cap_035": {
+          "consistent": false,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        "cap_036": {
+          "consistent": false,
+          "consistent_collapsed": true,
+          "sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve",
+              "retrieve"
+            ]
+          ]
+        }
+      }
+    },
+    "verdict_consistency": {
+      "rule": "k 次运行的任务成功判定全部相同的题占比；闭合题走 answer_keys 规则，开放题走逐次裁判分（>= 2 为成功），没有逐次裁判分的开放题不计入分母；报错的运行计为失败",
+      "value": 0.9444444444444444,
+      "n": 36,
+      "total": 36,
+      "source_counts": {
+        "rule": 26,
+        "judge": 10
+      },
+      "inconsistent_ids": [
+        "cap_016",
+        "cap_017"
+      ],
+      "unjudged_ids": [],
+      "stale_judge_rows": [],
+      "detail": {
+        "cap_001": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_002": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_003": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_004": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_005": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_006": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_007": {
+          "consistent": true,
+          "verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "cap_008": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_009": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_010": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_011": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_012": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_013": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_014": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_015": {
+          "consistent": true,
+          "verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "cap_016": {
+          "consistent": false,
+          "verdicts": [
+            false,
+            true,
+            true,
+            true,
+            false
+          ]
+        },
+        "cap_017": {
+          "consistent": false,
+          "verdicts": [
+            true,
+            true,
+            true,
+            false,
+            false
+          ]
+        },
+        "cap_018": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_019": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_020": {
+          "consistent": true,
+          "verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "cap_021": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_022": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_023": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_024": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_025": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_026": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_027": {
+          "consistent": true,
+          "verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "cap_028": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_029": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_030": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_031": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_032": {
+          "consistent": true,
+          "verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "cap_033": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_034": {
+          "consistent": true,
+          "verdicts": [
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "cap_035": {
+          "consistent": true,
+          "verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "cap_036": {
+          "consistent": true,
+          "verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      }
+    },
+    "success_rate_per_pass": {
+      "rule": "第 r 次 pass 的成功率 = 该 pass 里有判定的题的成功比例；std_sample 为 k 个成功率的样本标准差（ddof=1）",
+      "rates": [
+        0.7777777777777778,
+        0.8055555555555556,
+        0.8055555555555556,
+        0.7777777777777778,
+        0.75
+      ],
+      "n_per_pass": [
+        36,
+        36,
+        36,
+        36,
+        36
+      ],
+      "std_sample": 0.02324055629261322,
+      "std_population": 0.020786985482077462,
+      "k": 5
+    },
+    "answer_similarity": {
+      "rule": "同题 k 个答案两两余弦相似度（BGE 向量）；mean = 题内均值的均值，min = 题内最小值的最小值",
+      "embedding_model": "BAAI/bge-large-zh-v1.5",
+      "mean": 0.9483708712779302,
+      "min": 0.4531881140162862,
+      "min_id": "cap_006",
+      "n": 36,
+      "total": 36,
+      "per_question": {
+        "cap_001": {
+          "mean": 0.9609594526745882,
+          "min": 0.9307395332347932,
+          "n_pairs": 10
+        },
+        "cap_002": {
+          "mean": 0.8889056903075065,
+          "min": 0.7890930507524149,
+          "n_pairs": 10
+        },
+        "cap_003": {
+          "mean": 0.9591170801490065,
+          "min": 0.9175940552240214,
+          "n_pairs": 10
+        },
+        "cap_004": {
+          "mean": 0.9808216335304483,
+          "min": 0.9569190486184115,
+          "n_pairs": 10
+        },
+        "cap_005": {
+          "mean": 0.9957685325429042,
+          "min": 0.988911700054426,
+          "n_pairs": 10
+        },
+        "cap_006": {
+          "mean": 0.6943049718649604,
+          "min": 0.4531881140162862,
+          "n_pairs": 10
+        },
+        "cap_007": {
+          "mean": 0.9525407610912607,
+          "min": 0.929195375436499,
+          "n_pairs": 10
+        },
+        "cap_008": {
+          "mean": 0.9824785895564843,
+          "min": 0.9721070354573979,
+          "n_pairs": 10
+        },
+        "cap_009": {
+          "mean": 1.0000000000000004,
+          "min": 1.0000000000000004,
+          "n_pairs": 10
+        },
+        "cap_010": {
+          "mean": 0.9108261350182225,
+          "min": 0.8653600566043052,
+          "n_pairs": 10
+        },
+        "cap_011": {
+          "mean": 0.9030655242272264,
+          "min": 0.7840470860869964,
+          "n_pairs": 10
+        },
+        "cap_012": {
+          "mean": 0.8883417313779631,
+          "min": 0.8083621253572131,
+          "n_pairs": 10
+        },
+        "cap_013": {
+          "mean": 0.9808116050899395,
+          "min": 0.9511628918419082,
+          "n_pairs": 10
+        },
+        "cap_014": {
+          "mean": 1.0,
+          "min": 1.0,
+          "n_pairs": 10
+        },
+        "cap_015": {
+          "mean": 0.9198003226109138,
+          "min": 0.8486004037053199,
+          "n_pairs": 10
+        },
+        "cap_016": {
+          "mean": 0.8647639715456055,
+          "min": 0.7817493080998014,
+          "n_pairs": 10
+        },
+        "cap_017": {
+          "mean": 0.9535079344715955,
+          "min": 0.9343609016794487,
+          "n_pairs": 10
+        },
+        "cap_018": {
+          "mean": 0.9845050531046085,
+          "min": 0.9635611861310618,
+          "n_pairs": 10
+        },
+        "cap_019": {
+          "mean": 0.9652837965827347,
+          "min": 0.9406942002717865,
+          "n_pairs": 10
+        },
+        "cap_020": {
+          "mean": 0.8949119983643052,
+          "min": 0.8467227050039237,
+          "n_pairs": 10
+        },
+        "cap_021": {
+          "mean": 0.9737785835403043,
+          "min": 0.934316288174605,
+          "n_pairs": 10
+        },
+        "cap_022": {
+          "mean": 0.971282890308798,
+          "min": 0.9552948638288561,
+          "n_pairs": 10
+        },
+        "cap_023": {
+          "mean": 0.9375772395025532,
+          "min": 0.8959620658375886,
+          "n_pairs": 10
+        },
+        "cap_024": {
+          "mean": 0.9457706466507565,
+          "min": 0.8638840429585268,
+          "n_pairs": 10
+        },
+        "cap_025": {
+          "mean": 0.9640840891403493,
+          "min": 0.9410152560722554,
+          "n_pairs": 10
+        },
+        "cap_026": {
+          "mean": 0.9999999999999998,
+          "min": 0.9999999999999998,
+          "n_pairs": 10
+        },
+        "cap_027": {
+          "mean": 0.8991600543442632,
+          "min": 0.8436387577450992,
+          "n_pairs": 10
+        },
+        "cap_028": {
+          "mean": 0.9821826549581214,
+          "min": 0.9592140351906012,
+          "n_pairs": 10
+        },
+        "cap_029": {
+          "mean": 0.9962784088990423,
+          "min": 0.9937981571442236,
+          "n_pairs": 10
+        },
+        "cap_030": {
+          "mean": 0.9781527483552399,
+          "min": 0.9596480569046661,
+          "n_pairs": 10
+        },
+        "cap_031": {
+          "mean": 0.9956039914996998,
+          "min": 0.9890099787492495,
+          "n_pairs": 10
+        },
+        "cap_032": {
+          "mean": 0.9834460469522263,
+          "min": 0.9742620511575153,
+          "n_pairs": 10
+        },
+        "cap_033": {
+          "mean": 1.0,
+          "min": 1.0,
+          "n_pairs": 10
+        },
+        "cap_034": {
+          "mean": 0.9999999999999998,
+          "min": 0.9999999999999999,
+          "n_pairs": 10
+        },
+        "cap_035": {
+          "mean": 0.9193427020799818,
+          "min": 0.8740631533108271,
+          "n_pairs": 10
+        },
+        "cap_036": {
+          "mean": 0.9139765256638814,
+          "min": 0.8660324831751829,
+          "n_pairs": 10
+        }
+      }
+    },
+    "main_snapshot_comparison": {
+      "snapshot": "reports/latest.json",
+      "snapshot_timestamp_utc": "2026-09-06T09:28:35+00:00",
+      "snapshot_git_commit": "65bf140",
+      "snapshot_task_success_rate": 0.9166666666666666,
+      "snapshot_n": 36,
+      "n_compared": 36,
+      "n_all_runs_agree": 30,
+      "changed": [
+        {
+          "id": "cap_015",
+          "answer_type": "closed",
+          "main_success": true,
+          "run_verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "main_tool_sequence": [
+            "retrieve"
+          ],
+          "run_tool_sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        {
+          "id": "cap_016",
+          "answer_type": "closed",
+          "main_success": true,
+          "run_verdicts": [
+            false,
+            true,
+            true,
+            true,
+            false
+          ],
+          "main_tool_sequence": [
+            "retrieve"
+          ],
+          "run_tool_sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        {
+          "id": "cap_017",
+          "answer_type": "open",
+          "main_success": true,
+          "run_verdicts": [
+            true,
+            true,
+            true,
+            false,
+            false
+          ],
+          "main_tool_sequence": [
+            "retrieve"
+          ],
+          "run_tool_sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        {
+          "id": "cap_020",
+          "answer_type": "open",
+          "main_success": true,
+          "run_verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "main_tool_sequence": [
+            "retrieve"
+          ],
+          "run_tool_sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        {
+          "id": "cap_027",
+          "answer_type": "closed",
+          "main_success": true,
+          "run_verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "main_tool_sequence": [
+            "retrieve"
+          ],
+          "run_tool_sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        },
+        {
+          "id": "cap_036",
+          "answer_type": "open",
+          "main_success": true,
+          "run_verdicts": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "main_tool_sequence": [
+            "retrieve"
+          ],
+          "run_tool_sequences": [
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ],
+            [
+              "retrieve"
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  "cost": {
+    "n_runs": 180,
+    "n_questions": 36,
+    "total_tokens_all_runs": 526161,
+    "total_prompt_tokens": 486068,
+    "total_completion_tokens": 40093,
+    "mean_tokens_per_run": 2923.116666666667,
+    "tokens_per_full_round": 105232.2,
+    "cache_hit_tokens_total": 291944,
+    "cache_hit_share_of_prompt": 0.6006237810347523,
+    "by_run_index": {
+      "0": {
+        "mean_tokens": 2793.1388888888887,
+        "mean_cache_hit": 1070.2222222222222,
+        "p50_total_s": 2.3820327000030375
+      },
+      "1": {
+        "mean_tokens": 3072.9166666666665,
+        "mean_cache_hit": 1631.8055555555557,
+        "p50_total_s": 2.6858408499974757
+      },
+      "2": {
+        "mean_tokens": 2956.3888888888887,
+        "mean_cache_hit": 1898.4722222222222,
+        "p50_total_s": 2.5757902000004833
+      },
+      "3": {
+        "mean_tokens": 2751.6666666666665,
+        "mean_cache_hit": 1727.9166666666667,
+        "p50_total_s": 2.4441279000020586
+      },
+      "4": {
+        "mean_tokens": 3041.472222222222,
+        "mean_cache_hit": 1781.138888888889,
+        "p50_total_s": 2.547688750000816
+      }
+    }
+  }
+}
