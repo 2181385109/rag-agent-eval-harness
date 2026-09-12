@@ -1,7 +1,165 @@
-# HANDOFF — v1 封版交接（2026-09-06）
+# HANDOFF — 交接说明
 
-给下一轮对话（或下一个人）的接手说明。**最高约束仍是 [CLAUDE.md](CLAUDE.md)**，
-本文件只补充"当前停在哪、什么已定、什么还没定"。
+给下一轮对话（或下一个人）的接手说明。**最高约束是 [CLAUDE.md](CLAUDE.md)**（含 2026-09-12
+追加的 §13 测量与发布纪律），本文件只补充"当前停在哪、什么已定、什么还没定"。
+
+**先读 [§零（2026-09-12 现状）](#零2026-09-12-现状先读这一节)**——它描述工作区里未提交的
+改动与本次调查的结论。§一～§五是 2026-09-06 v1 封版时的记录，其中的指标数字（0.917 等）
+是**当时**的快照值，已被 §零 的事实覆盖，不要直接引用。
+
+---
+
+## 零、2026-09-12 现状（先读这一节）
+
+### 0.0 已提交的部分（HEAD = `56021c7`）
+
+在 v1（§一～§五）之上，2026-09-11/12 已提交四个 commit（`0aa2d57`…`56021c7`）：PERF_SPEC 任务 B 的
+稳定性/延迟测量包 `stability/`（`run_repeat` 每题 k=5 重复运行、`judge_runs` 开放题逐次裁判、
+`analyze` 出 `stability/summary.json` + `report.md`、`gate` 闸 C）、其原始产物
+`stability/raw/run_20260911T162531Z.jsonl`（36 题 × 5，180 行）与 `judge_20260911T163709Z.jsonl`
+（50 行）、`LIMITATIONS.md`、`Makefile`、README 的「闸 C」一节。入口：`python -m stability`
+（= `make stability`，本机无 make）；只重算不重跑：`python -m stability.analyze --raw … --judge …`。
+规格文件在仓库外（本机 `PERF_SPEC.md`，路径不入库）。
+
+### 0.1 你接手时的工作区：**有未提交改动，且明确要求不 commit、不 push**
+
+`git status` 里的每一个文件（截至 2026-09-12 09:30 UTC，基线 commit `56021c7`）：
+
+| 文件 | 状态 | 改了什么 |
+|---|---|---|
+| `CLAUDE.md` | M | 追加 §13：报告数字脚本生成、不得因结果重跑/换口径、不得调低阈值、push 前安全扫描原文 |
+| `HANDOFF.md` | M | 本文；旧 §六（PERF 任务 B 交接）已删，内容并入本节 |
+| `LIMITATIONS.md` | M | 第 4/4a/4b/5 条改写：模型归属、裁判独立性、裁判缓存未记录、缓存拆分 n=0；补 09-12 重跑事实 |
+| `src/eval/judge.py` | M | `DeepSeekJudge` 新增 `last_response_meta`（响应 model / 指纹 / 缓存命中），供调用方逐条记录；加 `_usage_field` |
+| `src/eval/report.py` | M | `find_previous_snapshot` 只认 `eval_YYYYMMDDTHHMMSSZ.json`，另存的对照快照不再被当成闸 B 基线；加 `SNAPSHOT_NAME_RE`；加 `repo_relative`，`backfill.source` / `reused_from` 记仓库相对路径（posix），不再写本机绝对路径 |
+| `stability/records.py` | M | `Latency` 加逐次调用缓存命中/未命中列表；`RunRecord` 加 `response_models` / `system_fingerprints`（逐条，旧记录为空列表） |
+| `stability/instrument.py` | M | 探针逐条记录每次 LLM 调用的响应 model / 指纹 / 缓存命中（此前只记首条） |
+| `stability/run_repeat.py` | M | 把上述逐条字段写进 RunRecord |
+| `stability/judge_runs.py` | M | 裁判行记录响应 model / 指纹 / usage（此前没有） |
+| `stability/analyze.py` | M | 新增：模型归属段+顶部告警、裁判独立性核验段、缓存拆分（n=0 时改一句话）、按 pass 单次调用表+两项检查、判定自洽率分路+裁判分标准差、翻转位置、多步检索行为对照段；标题改"请求名/响应名"；快照对照段去掉归因句 |
+| `stability/gate.py` | M | 可复现闸纳入 `model_attribution` 与探针文件；`retrieval_persistence` 与 `main_snapshot_comparison` 不重算（依赖 gitignore 的 traces） |
+| `stability/probe_models.py` | 新 | 模型归属探针：对 `MODEL_NAME` / `JUDGE_MODEL_NAME` 各发一条最小请求，落 `stability/raw/model_probe_*.json` |
+| `stability/rerun_main_eval.py` | 新 | 主评测对照重跑：单次、另存 `reports/eval_{name}.json`、不写 latest.json；`--ragas` 时给 RAGAS 的 ChatOpenAI 挂探针；`meta.served` 逐条记被测 / 裁判 / RAGAS 三条链路的响应 model / 指纹；RAGAS 前先落中间快照 |
+| `stability/rerun_report.py` | 新 | 对照重跑报告（脚本生成 markdown）：头部指标并列、RAGAS 原始口径与交集口径并列（逐题分缺失即「无法重算」）、三条事实（分母耦合 / 检索次数 vs recall / 独立性范围）、逐题判定变化。基线轨迹默认取与基线快照同名的 `traces_{name}.jsonl` 并逐题核对（答案 + retrieved_doc_ids），对不上即「未记录」——不再默认 `traces_latest.jsonl`（第 5 步同步 latest 时曾因此把 09-12 轨迹当成基线，靠 sha256 对比发现，已修） |
+| `scripts/security_scan.py` / `scripts/__init__.py` | 新 | CLAUDE.md §13.4 的 push 前安全扫描：逐条打印命中原文，`EXEMPTIONS` 里的豁免每条带出处；`--history` 扫全部提交 |
+| `stability/raw/model_probe_20260912T025754Z.json` | 新 | 探针产物（两个请求名 → 同一响应 model / 指纹；`/models` 列表） |
+| `stability/summary.json` / `stability/report.md` | M | 由同一批 09-11 原始产物 + 09-11 裁判分 + 探针重新生成（**没有重跑 180 次**） |
+| `reports/eval_20260912_rerun.json` | 新 | 09-12 主评测对照重跑快照（见 0.2）；`backfill.source` 已由本机绝对路径改为 `reports/judge_scores_20260912_rerun.jsonl` |
+| `reports/eval_20260912T074455Z_full.json` | 新 | 09-12 **全量**重跑快照（36 题单次 + 裁判 + RAGAS 四项；三条链路响应 model / 指纹逐条在 `meta.served`）；`backfill.source` 同样已改为相对路径。名字带 `_full`，按设计不作闸 B 基线 |
+| `reports/judge_scores_20260912T074455Z_full.jsonl` | 新 | 该重跑的 10 道开放题裁判分（cap_020 解析失败重问一次，共 11 次调用；指纹 10/10 核验） |
+| `reports/report_20260912T074455Z_full.md` | 新 | 上述快照 vs 09-06 快照的对照报告，`python -m stability.rerun_report --snapshot reports/eval_20260912T074455Z_full.json` 生成，重跑逐字节相同 |
+| `reports/eval_20260912T081718Z.json` | 新 | 全量重跑快照的规范名复制件（与 `_full` 原件、`latest.json` 三者 sha256 相同），闸 B 据此工作 |
+| `reports/latest.json` / `reports/report.md` | M | latest 指向 09-12 全量重跑；report.md 由其重新渲染（见 0.6） |
+| `reports/gate_fail_20260912T081718Z.txt` | 新 | 闸 B 首次拦下真实落差的 `--gate` 原文（不得删除或覆盖）；`.gitignore` 第 2 段加白名单 `!reports/gate_fail_*.txt` |
+| `reports/gate_accepted_regressions.json` | 新 | 闸 B 已接受的回归登记（1 条：task_success_rate 0.917→0.750，2026-09-12，归因不可行） |
+| `.gitignore` | M | 上述白名单一行 |
+| `README.md` / `CLAUDE.md` | M | 指标区 / §12：所有历史数字带测量日期与复现状态（09-06 vs 09-12 两列），出处列改为快照字段；README 加「脱敏与历史」「拦下之后怎么办」；CLAUDE.md §13.4 corpus 已公开 |
+| `reports/judge_scores_20260912_rerun.jsonl` | 新 | 该重跑的 10 道开放题裁判分（带响应字段，指纹 10/10 核验） |
+| `tests/test_stability_analyze.py` | M | +14 条口径测试（缓存拆分、pass 0 规则、分路、翻转位置、归属、独立性措辞、检索对照） |
+| `tests/test_gate.py` | M | +1 条：非流水线命名的快照不作闸 B 基线；已接受回归机制 +16 条（登记只对那一对快照/指标/数值生效、缺日期/原因/接受人即报错、登记项指向存在的快照、门禁输出打印原因）；回归断言改为「无新增 dropped」 |
+| `tests/test_rerun_report.py` | 新 | +10 条：交集口径缺逐题分即无法重算、分母耦合、检索次数 vs recall、独立性范围、渲染措辞 |
+| `tests/test_report.py` | M | +3 条：溯源路径记仓库相对路径；+3 条：请求名/响应名并列打印、未记录不回填、agreement 缺失要说出来 |
+| `tests/test_secrets.py` | M | +3 条：安全扫描零未豁免命中、豁免必须带出处、扫描器能抓到样本 |
+| `reports/traces_20260912_rerun.jsonl` / `reports/traces_20260912T074455Z_full.jsonl` | gitignore | 两次重跑的完整轨迹（不入库） |
+
+验证状态：`pytest -m "not live"` **395 passed**；`python -m scripts.security_scan` 未豁免命中 0；`python -m src.eval.report --gate` 见第 3 步（本轮尚未重跑）。
+
+### 0.2 本次调查的事实结论（只列事实）
+
+**模型归属**
+- 本仓库所有 LLM 调用的 `model` 参数都来自 `src/config.py` 的硬编码常量（被测 `deepseek-chat`、
+  裁判 `deepseek-reasoner`），无环境变量覆盖；我方没有传错。
+- 这两个请求名已于 2026-07-24 被 DeepSeek 官方弃用，现由旧名路由至 `deepseek-flash`（V4.1 Flash）。
+  09-11 的 180 次运行、试点 25 次、09-12 的重跑 36 次与探针 2 次，响应 `model` 字段**全部**为
+  `deepseek-flash`，`system_fingerprint` 全部为 `aeb56401ca74e127821c4f9126dcb669`。
+  端点 `GET /models` 只列出 `deepseek-flash` 与 `deepseek-v4-pro`。
+- 裁判链路请求 `deepseek-reasoner`，09-12 探针与重跑记录的响应 model / 指纹与被测链路**相同**
+  （`deepseek-reasoner` 的响应仍含 `reasoning_tokens`）。固定措辞：
+  **「本次运行无法确认裁判与被测模型的独立性，开放题判定结果（n=10）应据此折价。」**
+
+**指标不可复现**
+- 2026-09-06 快照（`reports/latest.json` = `eval_20260906T092835Z.json`）：任务成功率 0.917。
+  2026-09-12 同一代码、同一磁盘索引单次重跑（`reports/eval_20260912_rerun.json`）：**0.750**（n=36/36）。
+- 判定变化恰好 6 题、全部 True→False：`cap_015/016/017/020/027/036`，与 09-11 稳定性运行里判定
+  变化的是同一组题。recall 并集 0.968 → 0.871；**仅首次检索的 recall 不变（0.774）**；
+  tool_accuracy 0.944 → 1.000；retrieve 调用次数中位数 1.0 → 2.0（升）。
+- 已排除的因素：两个 commit（`65bf140`↔`78b5122`/`56021c7`）间 `src/`、黄金集、判定规则、裁判判据
+  逐字相同（md5 相同）；`index/`（09-04 建）与 `65bf140` 的语料切分逐块相同且未重建，
+  两次运行的检索输入相同；判定口径相同。
+- **归因不可能**：09-06 快照及其轨迹只记了请求名，没有记录响应 model / 指纹，
+  无法知道当时落在哪个后端。这是记录缺口，不是可以推断的事。
+
+### 0.3 三道闸：当前阈值与来历
+
+| 闸 | 判据 | 阈值 / 基线 | 怎么定的 | 本次是否新定 |
+|---|---|---|---|---|
+| A 口径闸 | 冻结子集（`tests/fixtures/`，10 题）重算五个指标，与 `reports/gate_baseline.json` **逐位相等** | 基线：recall 0.833(6/10)、首次 recall 0.667、任务成功率 0.8(10/10)、工具 0.8、宽松工具 0.8；commit `5521864`，2026-09-06 | 输入冻结，数字没理由变；改口径必须显式 `--write-gate-baseline` | 否 |
+| B 回归闸 | `reports/latest.json` vs 上一份 `eval_YYYYMMDDTHHMMSSZ.json`；`task_success_rate` / `tool_accuracy` / `faithfulness` 跌超容差即 fail；分母/判据版本/题数变则 incomparable | `METRIC_DROP_TOLERANCE = 0.05` | CLAUDE.md §7 给定 | 否（本次只收紧了"上一份快照"的文件名匹配） |
+| C 稳定性闸 | `stability/summary.json`：成功率跨 k 次样本标准差 ≤ 阈值；轨迹自洽率（严格口径）≥ 阈值；且 summary 除答案相似度/快照对照/检索对照三段外必须能由 `stability/raw/` + 裁判分 + 探针重算逐位相等 | `STABILITY_MAX_SUCCESS_RATE_STD = 0.05`（规格给定）；`STABILITY_MIN_TRAJECTORY_CONSISTENCY = 0.727` | 0.05 来自 PERF_SPEC；0.727 = 首次全量实测 0.7778 − 0.05（与闸 B 同容差），规则在看到全量数字**之前**拍板，规格提议的 0.8 未达标已记 LIMITATIONS | **是**（2026-09-12 建，已冻结，不许调低） |
+
+2026-09-12 更新：全量重跑快照已复制为规范名 `eval_20260912T081718Z.json`（名字取自其 `meta.timestamp_utc`，
+与原件逐字节一致）并写入 `latest.json`；闸 B 随即报 `task_success_rate dropped (-0.1667)`，原文存档
+`reports/gate_fail_20260912T081718Z.txt`（不得删除或覆盖）。该下跌已在 `reports/gate_accepted_regressions.json`
+登记为已接受的回归（日期 / 原因 / 接受人，只对 `eval_20260912T081718Z.json` vs `eval_20260906T092835Z.json`
+这一对生效），`--gate` 与 `tests/test_gate.py` 改为「相对已接受基线无新增 dropped」。闸 B 对 RAGAS 分母
+不敏感的问题见 LIMITATIONS 第 19 条。`eval_20260912T074455Z_full.json` 与 `eval_20260912T081718Z.json` 内容相同
+（sha256 一致）为**有意保留**：前者是原始产物名（`rerun_main_eval` 按启动时刻命名），后者是流水线规范名
+（按 `meta.timestamp_utc`）供闸 B 识别；删任一份都会断掉一条可追溯链路。
+
+### 0.4 已知未解释现象（禁止编解释）
+
+09-11 稳定性运行里，pass 0（同题首轮、无跨轮服务端缓存）端到端 P50 = 2.38s，**低于**后续四个
+pass（2.44–2.69s）。已核查：各 pass 单次 LLM 调用 P50 接近（相对 pass 0 偏差 ≤ 6%）；
+平均 n_llm_calls 相同（2.06–2.08）；把轨迹长度固定为 2 次调用后 pass 0 仍最快
+（2.38s vs 2.41–2.65s）。所以"轨迹长度"和"缓存"都解释不了它。报告标为「未解释现象」，
+`analyze.pass0_observation` 的判定规则写在代码里；不要在任何文档里给它编一个原因。
+
+另一处不可测：运行级 `cache_hit == 0` 的未命中组 n=0（每次运行 ≥2 次调用，第二次必命中
+前缀），按缓存命中拆延迟在这批数据上做不到；逐次调用的缓存命中自 09-12 起才记录。
+
+### 0.5 措辞红线
+
+- 不得写「静默换模型」「厂商未告知」之类对厂商行为的推断；只写「请求名已弃用、实际服务模型为
+  deepseek-flash」。
+- 不得写「裁判即被测模型」；只写「本次运行无法确认裁判与被测模型的独立性，开放题判定结果
+  （n=10）应据此折价」（`analyze.JUDGE_INDEPENDENCE_UNCONFIRMED`，有测试钉住）。
+- 不得写「模型变笨」或任何对 0.917→0.750 的归因；检索对照一节的结论句只填数字。
+- 报告里的数字一律脚本生成；HANDOFF / LIMITATIONS 引用时以生成物为准。
+
+### 0.6 尚未完成
+
+- faithfulness 已在当前服务模型下重跑（09-12，`reports/eval_20260912T074455Z_full.json`：
+  **0.898，n=33/33**；09-06 为 0.862，n=35/35——分母不同，按闸 B 口径 incomparable；
+  `cap_033/034` 本次 0 次检索被 RAGAS 排除，同一行为使 tool_accuracy 0.944→1.000）。
+  对照见脚本生成的 `reports/report_20260912T074455Z_full.md`。闸 B 里的 faithfulness 仍是 09-06 值。
+- **待办：`ragas_runner._evaluate_rows` 需把逐行分数一并落盘**（当前只返回列均值，本轮未改）。
+  含 RAGAS 段的全部快照都没有逐题分，09-06 vs 09-12 的 33 题交集口径因此「无法重算」
+  （LIMITATIONS 第 16 条）。改完要重跑一次 RAGAS 才有逐题分，旧快照补不回来。
+- 重跑结果已进入 latest.json / 闸 B（见 0.3）；`reports/report.md` 已由新 latest 重新渲染（由此**不再含**
+  「自动↔人工一致率」与「裁判判据修订对照」两节——人工标注是对 09-06 答案做的，对新答案没有 kappa），
+  `reports/traces_latest.jsonl` 已同步为 09-12 全量重跑轨迹，09-06 轨迹保留在 `reports/traces_20260906T092835Z.jsonl`
+  （两者都 gitignore，仅本机）。README 与 CLAUDE.md §12 的简历 bullet 仍写着
+  0.917 等 09-06 数字——2026-09-12 已改：每个数字带测量日期与复现状态（09-06 vs 09-12 重跑两列），
+  「出处」列改为快照 JSON 字段。`render_markdown` 已改为并列打印请求名 / 响应名（按次计数，来自
+  `meta.served`，没有就「未记录」），agreement 为空时打印「本快照不含此节」；report.md 已按新渲染重生成。
+- `index/` 早于语料脱敏（见 §五），重建会移动 doc_id，需先全量重扫标注；未做。
+- 09-11 的 50 条裁判分没有响应字段（`judge_runs.py` 现已记录，下次运行起生效）。
+- **未 commit、未 push**（工作区如 0.1）。
+
+### 0.7 下一步（建议顺序）
+
+1. 由项目负责人决定是否接受本次工作区改动并提交（提交信息要写明：为什么加探针、闸 B 文件名匹配为何收紧）。
+2. 决定被测模型名的处理：`config.MODEL_NAME` / `JUDGE_MODEL_NAME` 改为端点实际列出的名字，
+   还是保留旧名并在报告里持续标注响应名。改名会触发闸 A 之外的一切口径讨论，先问再动。
+3. ~~若要让 0.917→0.750 进入门禁~~ 已做（见 0.3）：闸 B 拦下并存档，下跌登记为已接受的回归；
+   闸 A 基线未动。`gate_accepted_regressions.json` 的接受人：姚尹杰（2026-09-12 确认）。
+4. ~~RAGAS 在当前服务模型下重跑（`--ragas`），补 faithfulness。~~ 已做（09-12 全量重跑，见 0.6）。
+   剩余：`_evaluate_rows` 落逐行分数后再跑一次，才有跨快照的交集口径。
+5. 裁判独立性：换一个响应 model / 指纹**不同**的裁判端点或模型，重跑 10 道开放题裁判，
+   再谈 kappa；否则简历里的 kappa 必须带 0.2 的限定。
+6. 修 README / CLAUDE.md §12 的数字为当前生成物的值，并注明快照与服务模型名。
+7. push 前：`python -m scripts.security_scan --history`（CLAUDE.md §13.4），把输出原文贴出
+   （`corpus/` 已随此前提交公开，见 §一；历史里的本机路径按 LIMITATIONS 第 17 条不改写）。
 
 ---
 
@@ -15,7 +173,10 @@
 
 - `pytest -m "not live"` **309 项全绿**
 - `python -m src.eval.report --gate` **PASS**（闸 A 口径闸 + 闸 B 回归闸）
-- **尚未推到 GitHub。** 推之前必须先问用户是否愿意公开 `corpus/` 里的私有技术文档。
+- **已推送到 GitHub**（本条原写「尚未推到 GitHub」，2026-09-12 更正）：`origin` =
+  `github.com/2181385109/rag-agent-eval-harness`，`origin/main` = `78b5122`（`git ls-remote` 确认）；
+  本地 `main` 领先 4 个 commit 未推（`0aa2d57` `b79c6f6` `450a893` `56021c7`，stability 那批）。
+  `corpus/` 两份规格书已在 `origin/main` 里，即已公开。历史脱敏状态见 LIMITATIONS 第 17 条。
 - v2（安全红队 / FastAPI+Streamlit demo / MLflow / rerank）**一律不碰**，见 CLAUDE.md §11。
 
 ### 封版的三个 commit
@@ -199,7 +360,9 @@ python -m src.eval.report --write-gate-baseline
 python -m src.eval.report --from-traces reports/traces_latest.jsonl --no-judge-backfill
 ```
 
-**本机注意**：跑测试要用 `./.venv/Scripts/python.exe -m pytest`（不能用全局 `python`）；
+**本机注意**：`traces_latest.jsonl` 自 2026-09-12 起是 09-12 全量重跑的轨迹，与 `eval_20260905T142507Z.json` 的 RAGAS 段
+不再同源——上面 `--reuse-ragas` 那条示例现在会被指纹核验拦下（这是对的）；09-06 轨迹在 `traces_20260906T092835Z.jsonl`。
+跑测试要用 `./.venv/Scripts/python.exe -m pytest`（不能用全局 `python`）；
 中文 CLI 需 `PYTHONIOENCODING=utf-8`（Windows 控制台 cp936）。
 
 ---
@@ -222,67 +385,3 @@ python -m src.eval.report --from-traces reports/traces_latest.jsonl --no-judge-b
   没有为了填满表格去凑一个不在这份快照里的数字。
 
 ---
-
-## 六、PERF_SPEC 任务 B 交接（2026-09-12）：延迟分解 + 稳定性 + 闸 C
-
-规格：仓库外的本机 `PERF_SPEC.md` §3（路径不入库）。本节按它 §5.2 的要求写：改了什么、产物在哪、
-阈值怎么定的、下次从哪接。
-
-### 改了什么
-
-- 新增 `stability/` 包（规格指定的目录，不在 `src/` 下）：
-  `run_repeat.py`（每题 k 次，逐行落盘，pass-major 顺序，预热排除 BGE 懒加载）、
-  `instrument.py`（给 `llm.chat_completion` 与 `ToolBox.run` 挂计时探针，不改 Agent 代码）、
-  `records.py`（一行一次运行的 pydantic schema）、`judge_runs.py`（开放题逐次裁判，复用
-  `src/eval/judge` 的 reasoner + v2 判据）、`analyze.py`（raw -> summary.json + report.md）、
-  `gate.py`（闸 C）、`__main__.py`（`python -m stability` = `make stability`）。
-- `src/eval/report.run_gates` 接入闸 C；`src/config.py` 新增 `STABILITY_*` 三个常量。
-- 新增 `tests/test_stability_analyze.py`（指标口径）与 `tests/test_stability_gate.py`（闸 C），
-  `pytest -m "not live"` 由 332 → **364** 项。
-- 新增 `LIMITATIONS.md`、`Makefile`；README 加了「闸 C」一节（不手抄数字）；CI 注释同步。
-
-### 产物在哪（全部进 git，永不覆盖；文件名带时间戳）
-
-| 文件 | 内容 |
-|---|---|
-| `stability/raw/run_20260911T161706Z.jsonl` + `.meta.json` | **试点**：5 题（cap_001/006/007/033/035）× 5，25 行 |
-| `stability/raw/judge_20260911T162111Z.jsonl` | 试点开放题逐次裁判分，10 行 |
-| `stability/raw/run_20260911T162531Z.jsonl` + `.meta.json` | **全量**：36 题 × 5，180 行，0 报错 |
-| `stability/raw/judge_20260911T163709Z.jsonl` | 全量开放题逐次裁判分，50 行 |
-| `stability/summary.json` / `stability/report.md` | 由全量 run + judge 生成；闸 C 读它 |
-| `stability/pilot_20260911_report.md` | 试点的报告（同一脚本生成，改名留档） |
-
-试点的运行记录按规格保留、不删；它不是 summary 的来源。
-
-### 阈值怎么定的（先定规则、后看数字）
-
-- `STABILITY_MAX_SUCCESS_RATE_STD = 0.05`：规格给定值，实测通过。
-- `STABILITY_MIN_TRAJECTORY_CONSISTENCY = 0.727`：规格提议 0.8，试点严格口径只有 0.40，
-  与项目负责人在看到全量数字**之前**拍板：门禁盯严格口径，阈值 = 首次全量实测值 − 0.05
-  （与闸 B 同一容差），一次性冻结。全量实测 0.7778 → 0.727。**规格的 0.8 未达标**，
-  记在 LIMITATIONS.md 第 1 条；自此不许再调低。
-- 判定自洽率、答案相似度不设门禁（规格只要求两条）。
-
-### 本次测出来的三件事（数字看 stability/report.md，这里只说结论）
-
-1. **temperature=0 不确定**：不一致的 8 题全部是 `retrieve` 调用**次数**在变（1 次 vs 2 次，
-   cap_007 在 4~7 次之间），折叠连续重复后 36/36 一致——工具**选择**从未变过，变的是
-   "要不要再查一次"。轨迹自洽率 < 判定自洽率，即规格 B2 预言的"路径不稳但结果凑对了"。
-2. **被测模型换了后端**：请求 `deepseek-chat`，响应 `model` 字段是 `deepseek-flash`。
-   与 09-06 主评测快照逐题对照（report.md「对照主评测快照」一节，脚本算的）：6 题判定
-   变化，检索逐位相同，差异全在模型侧——模型现在更少发起第二次改写检索。
-   **这是闸 B 该抓的漂移，但闸 B 只比主评测快照；确认需重跑 `python -m src.eval.report`。**
-   本次没跑（规格外、要花钱）——**这是下一步最该做的事**，跑完闸 B 大概率 FAIL，那是正确的。
-3. **延迟几乎全在等 API**：LLM 段占端到端九成以上，本机检索不到一成，编排开销可忽略。
-   优化方向只有减少 LLM 调用次数（那个 "要不要再查一次" 的抖动同时也是延迟与 token 的抖动）。
-
-### 下次从哪接
-
-- [ ] 重跑主评测，让闸 B 对 09-06 快照正式比对（预期 task_success_rate 明显下跌）。
-      若确认是服务端换后端，报告 meta 里没有记录当时的响应 `model` 字段——
-      `AgentTrace.model` 记的是**请求**的模型名；可考虑把 `response_model` 也记进轨迹。
-- [ ] `index/`（09-04 建）早于语料脱敏（09-06）：重建会移动 doc_id，必须先按
-      `data/annotation_criteria.md` 全量重扫 `expected_doc_ids`。在那之前，模型在 cap_035
-      的答案里仍会逐字引用旧路径（本次 raw 里有 5 处，与 §三点五保留的 5 处同性质）。
-- [ ] 推 GitHub 前：仍需先问是否公开 `corpus/`（§一）；本次安全扫描结果见对话记录。
-- [ ] `Makefile` 在本机跑不了（无 make）；Windows 用 `python -m stability`。

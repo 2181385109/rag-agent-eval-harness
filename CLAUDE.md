@@ -300,22 +300,25 @@ M1–M6 完成即 v1 收工。**不要跳步，M6 之前不碰 v2。**
 
 ## 12. 目标简历 bullet（建整个项目就是为了让这句话每个数字都为真）
 
-> 构建 RAG Agent 端到端评测流水线（LangGraph + FAISS + RAGAS）：对 **36** 条自建黄金集自动评估任务成功率（**0.917**，闭合题规则判定 + 开放题 LLM-as-Judge ≥2 分回填）、工具调用准确率（**0.944**）、检索召回率 recall@4（**0.968**，n=31/36 并集 · **0.774** 仅首次检索）、答案忠实度 faithfulness（**0.862**）；引入 LLM-as-Judge 并与人工标注对照，报出自动↔人工一致率 **kappa=0.623**（unweighted，n=10，95% CI [0.231, 1.000]）；评测标准以 **332** 条 pytest 固化并接入 GitHub Actions 做提交级回归门禁，指标漂移即 fail。黄金集采用防污染构造（不复用公开 benchmark），沿用信贷风控项目中防数据泄漏的同一方法论。
+> 构建 RAG Agent 端到端评测流水线（LangGraph + FAISS + RAGAS）：对 **36** 条自建黄金集自动评估任务成功率（2026-09-06 测量 **0.917**；2026-09-12 同代码同索引重跑 **0.750**，未复现，闸 B 拦下并登记为已接受回归）、工具调用准确率（0.944 → 1.000）、检索召回率 recall@4（并集 0.968 → 0.871，未复现；仅首次检索 0.774 → 0.774，复现；n=31/36）、答案忠实度 faithfulness（0.862 n=35 → 0.898 n=33，分母不同不可比）；引入 LLM-as-Judge 并与人工标注对照，自动↔人工一致率 **kappa=0.623**（unweighted，n=10，95% CI [0.231, 1.000]；2026-09-06 对当时答案的测量，答案已变，2026-09-12 起不可复现，需重新标注）；评测标准以 **418** 条 pytest（2026-09-12 计数）固化并接入 GitHub Actions 做提交级回归门禁，指标漂移即 fail。黄金集采用防污染构造（不复用公开 benchmark），沿用信贷风控项目中防数据泄漏的同一方法论。
 
-**每个数字的出处**（对应 [reports/report.md](reports/report.md)，commit `65bf140` 生成，快照 `reports/eval_20260906T092835Z.json`）：
+**每个数字的出处**（两份快照 JSON 都进 git：`reports/eval_20260906T092835Z.json`（`git_commit` 65bf140）与
+`reports/eval_20260912T081718Z.json`（= 当前 latest.json，commit 56021c7）；当前 `reports/report.md` 对应 09-12 那份，
+09-06 的 report.md 版本在 git 历史 `804542e`；逐题对照见 `reports/report_20260912T074455Z_full.md`）：
 
-| bullet 里的数字 | report.md 出处 | 备注 |
+| bullet 里的数字 | 出处 | 复现状态（2026-09-12 重跑） |
 |---|---|---|
-| 36 条黄金集 | 「## 指标」表头「黄金集：36 条」 | 闭合题 26 / 开放题 10 |
-| 任务成功率 0.917 | 「## 指标」表 + 「任务成功率的判定口径」 | n=36/36；失败 3 题 `cap_007/032/035`，均因裁判判据 v2 下要点有缺失 |
-| 工具调用准确率 0.944 | 「## 指标」表 | 严格=宽松；唯二失误 `cap_033/034` 都是多带了一次 `retrieve` |
-| recall@4 0.968 / 0.774 | 「## 指标」表 | 并集口径 n=31/36（5 题无标注不计入）；仅首次检索口径同分母，差值＝多次检索捞回的部分，**两个必须一起写** |
-| faithfulness 0.862 | 「## RAGAS」表 | n=35/35；该节已**机器验证**轨迹指纹与来源快照一致（35/35），复用成立，非未经验证的断言 |
-| kappa 0.623 | 「## 自动↔人工一致率」表 | unweighted，n=10；quadratic 口径为 0.324，两个并列，不挑好看的 |
-| 332 pytest | `pytest -m "not live"` 实跑输出 | 精确值，可用同一条命令重新数出来 |
+| 36 条黄金集 | 两份快照 `meta.golden_set_size` | 复现；闭合题 26 / 开放题 10 |
+| 任务成功率 0.917 → 0.750 | `metrics.task_success_rate`；当前 report.md「任务成功率的判定口径」 | 未复现（−0.167）；09-06 失败 `cap_007/032/035`，09-12 失败 9 题（新增 `cap_015/016/017/020/027/036`，全部 True→False）；闸 B 原文 `reports/gate_fail_20260912T081718Z.txt` |
+| 工具调用准确率 0.944 → 1.000 | `metrics.tool_accuracy`；当前 report.md「指标」表 | 未复现（+0.056）；09-06 唯二失误 `cap_033/034` 多带一次 `retrieve`，09-12 未再多带 |
+| recall@4 0.968 → 0.871 / 0.774 → 0.774 | `metrics.recall_at_k` / `recall_at_k_first_call` | 并集未复现、仅首次检索复现（同分母 n=31/36）；差值＝多次检索捞回的部分，**两个必须一起写** |
+| faithfulness 0.862 → 0.898 | `metrics.ragas.scores.faithfulness`；当前 report.md「RAGAS」表 | 分母 35→33 不可比（`cap_033/034` 本次无检索内容被排除）；09-06 值复用自 09-05 快照、轨迹指纹核验 35/35 |
+| kappa 0.623 | 09-06 快照 `metrics.agreement`；当前 report.md 该节标「本快照不含此节」 | 不可复现（LIMITATIONS 第 22 条）；quadratic 口径 0.324 并列，不挑好看的 |
+| 418 pytest | `pytest -m "not live"` 实跑输出（2026-09-12） | 精确值，同一条命令可重新数出来；09-06 为 332 |
 
-**引用 kappa=0.623 时必须连带的两句话（面试防御备注，不许省）：**
+**引用 kappa=0.623 时必须连带的三句话（面试防御备注，不许省）：**
 
+0. 它是 2026-09-06 对当时那批答案的测量，答案已变，2026-09-12 起不可复现、不可直接重算（LIMITATIONS 第 22 条）。
 1. 这个数是**判据修订后**的结果（v1 结论级 kappa=0.216 → v2 要点级 kappa=0.623）。
    上升有相当一部分是**构造性的**——v2 的本质是让自动裁判去复现人工标注本来就在用的
    要点级判定口径，不是两个互相独立的评分者自发达成一致。真正的独立双盲一致性，
@@ -326,3 +329,23 @@ M1–M6 完成即 v1 收工。**不要跳步，M6 之前不碰 v2。**
 
 完整的判据修订过程、改前改后对照、分歧归因见 CLAUDE.md §6 修订记录 6-9 与
 [data/agreement_interpretation.md](data/agreement_interpretation.md)。
+
+---
+
+## 13. 测量与发布纪律（2026-09-12 追加，与 §1 同级的硬约束）
+
+以下四条来自 PERF_SPEC §1 的铁律，在本仓库内与 §1 的红线同等效力：
+
+1. **报告里的数字一律由脚本从原始产物生成，不手写。** `stability/report.md`、`reports/report.md`
+   由 `analyze` / `report` 脚本生成；README、HANDOFF、LIMITATIONS 引用数字时必须注明出自哪份
+   生成物，且闸 C 会从 `stability/raw/` 重算 `summary.json` 逐位比对——手改的数字在 CI 上必挂。
+2. **不得因为结果难看而重跑、删除、挑选运行记录，或更换口径。** 所有运行记录带时间戳保留
+   （`stability/raw/`、`reports/eval_*.json`）；工具故障导致的重跑要在产物 meta 里记明原因。
+   口径只能在看到数字**之前**定，改口径必须在提交信息里说明并让闸 A 的基线 diff 可见。
+3. **指标未达门槛时不得调低阈值。** 阈值一经写入 `src/config.py`（`METRIC_DROP_TOLERANCE`、
+   `STABILITY_MAX_SUCCESS_RATE_STD`、`STABILITY_MIN_TRAJECTORY_CONSISTENCY`）即冻结；未达标只在
+   `LIMITATIONS.md` 记录事实。`STABILITY_MIN_TRAJECTORY_CONSISTENCY=0.727` 是按"首次全量实测值 − 0.05"
+   的事先约定定下的，规格提议的 0.8 未达标已记录，不许再动。
+4. **push 前必须执行完整安全扫描，并把扫描输出原文贴出确认，不接受摘要。** 至少覆盖：
+   API key 模式、主机名/用户名/用户目录路径、`.env` 是否入库、jsonl/json 产物里的密钥。
+   事实：`corpus/` 两份规格书已随 `origin/main`（`78b5122`）公开；历史提交里的本机路径按 LIMITATIONS 第 17 条不改写。

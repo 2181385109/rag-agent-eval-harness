@@ -34,37 +34,43 @@
 
 ## 指标
 
-以下数字全部取自 [reports/report.md](reports/report.md)（commit `65bf140` 生成，
-快照 `reports/eval_20260906T092835Z.json`），可用下面「复现全量评测」里的命令重新跑出来。
+两列分别取自两份进 git 的快照 JSON：**2026-09-06** `reports/eval_20260906T092835Z.json`（`git_commit` 65bf140）
+与 **2026-09-12** `reports/eval_20260912T081718Z.json`（= 当前 `reports/latest.json`，commit 56021c7；同一代码、
+同一磁盘索引、同一黄金集与判据，单次重跑；被测 / 裁判 / RAGAS 三条链路的响应模型均为 `deepseek-flash`，
+请求名仍是 `deepseek-chat` / `deepseek-reasoner`，见 [LIMITATIONS.md](LIMITATIONS.md) 第 4 条）。
+当前 [reports/report.md](reports/report.md) 对应 09-12 那份；09-06 的 report.md 在 git 历史里（commit `804542e`）。
+逐题对照见 [reports/report_20260912T074455Z_full.md](reports/report_20260912T074455Z_full.md)（脚本生成）。
+**不保留裸数字**：每个值都带测量日期与复现状态。
 
-| 指标 | 值 | 分母 | 出处 |
-|---|---|---|---|
-| 黄金集规模 | 36 条 | 闭合 26 / 开放 10 | `report.md` 表头 |
-| 检索召回率 recall@4（并集） | **0.968** | n=31/36 | `report.md` · 指标 |
-| recall@4（仅首次检索） | **0.774** | n=31/36 | 同上；差值＝多次检索捞回的部分 |
-| 任务成功率 | **0.917** | n=36/36 | `report.md` · 任务成功率的判定口径 |
-| 工具调用准确率（严格/宽松） | **0.944** | n=36/36 | `report.md` · 指标；两口径相同 |
-| faithfulness | **0.862** | n=35/35 | `report.md` · RAGAS（复用前提已机器指纹核验，35/35 一致） |
-| answer_relevancy | **0.826** | n=35/35 | 同上 |
-| context_recall | **0.824** | n=35/35 | 同上 |
-| context_precision | **0.670** | n=35/35 | 同上 |
-| 自动↔人工一致率 kappa（unweighted） | **0.623** | n=10，95% CI [0.231, 1.000] | `report.md` · 自动↔人工一致率 |
-| 自动↔人工一致率 kappa（quadratic） | 0.324 | n=10，95% CI [0.000, 1.000] | 同上；两口径并列，不挑好看的 |
-| 多轮一致性（temp=0 / temp>0） | _（本次快照未含）_ | — | 需 `--consistency-runs`；当前报告走的是 `--from-traces` 复用路径，未重跑一致性子集 |
-| pytest（离线，`-m "not live"`） | **332 passed** | — | 不在 report.md 里，是 `pytest -m "not live"` 的实跑输出——同一条命令可重新数出来 |
+| 指标 | 2026-09-06 | 2026-09-12 重跑 | 复现状态 | 出处（快照 JSON 字段） |
+|---|---|---|---|---|
+| 黄金集规模 | 36 条（闭合 26 / 开放 10） | 36 条 | 复现 | `meta.golden_set_size` |
+| 检索召回率 recall@4（并集） | 0.968（n=31/36） | 0.871（n=31/36） | 未复现（−0.097） | `metrics.recall_at_k` |
+| recall@4（仅首次检索） | 0.774（n=31/36） | 0.774（n=31/36） | 复现 | `metrics.recall_at_k_first_call` |
+| 任务成功率 | 0.917（n=36/36） | 0.750（n=36/36） | 未复现（−0.167）；闸 B 拦下（`reports/gate_fail_20260912T081718Z.txt`），登记为已接受回归 | `metrics.task_success_rate` |
+| 工具调用准确率（严格/宽松） | 0.944（n=36/36） | 1.000（n=36/36） | 未复现（+0.056） | `metrics.tool_accuracy` / `tool_set_accuracy` |
+| faithfulness | 0.862（n=35/35；复用自 09-05 快照，轨迹指纹核验 35/35） | 0.898（n=33/33） | 分母不同，不可比（`cap_033/034` 本次无检索内容被排除） | `metrics.ragas.scores.faithfulness` |
+| answer_relevancy | 0.826（n=35） | 0.694（n=33） | 分母不同，不可比 | `metrics.ragas.scores` |
+| context_recall | 0.824（n=35） | 0.727（n=33） | 分母不同，不可比 | 同上 |
+| context_precision | 0.670（n=35） | 0.654（n=33） | 分母不同，不可比 | 同上 |
+| kappa（unweighted） | 0.623（n=10，95% CI [0.231, 1.000]） | —（无） | 不可复现：人工标注对应 09-06 答案，答案已变，需重新标注（LIMITATIONS 第 22 条） | `metrics.agreement`（09-06 快照） |
+| kappa（quadratic） | 0.324（n=10，95% CI [0.000, 1.000]） | —（无） | 同上 | 同上 |
+| 多轮一致性（temp=0 / temp>0） | 未含 | 未含 | 稳定性另见 `stability/report.md`（2026-09-11，k=5，闸 C） | — |
+| pytest（离线，`-m "not live"`） | 332 passed（2026-09-06） | 418 passed（2026-09-12） | 随测试数增加而变，同一条命令可重新数出 | `pytest -m "not live"` 实跑输出 |
 
-**kappa=0.623 必须连带的两条限定**（不许只引用数字本身）：
+**引用 kappa=0.623 时必须连带的三条限定**（不许只引用数字本身）：
 
-1. 这是**判据修订后**的结果（v1 结论级 0.216 → v2 要点级 0.623）。上升有相当一部分是
+1. 它是 2026-09-06 对当时那批答案的测量；答案已变，2026-09-12 起不可复现、不可直接重算，需重新标注。
+2. 这是**判据修订后**的结果（v1 结论级 0.216 → v2 要点级 0.623）。上升有相当一部分是
    构造性的——v2 本质是让自动裁判去复现人工标注本来就在用的要点级口径，
    不是两个独立评分者自发趋同；真正的独立一致性需要人工在 v2 判据下重新盲标，本轮未做。
-2. n=10，95% CI 上界顶到 1.0，区间的收窄程度配不上点估计的涨幅，不构成硬结论。
+3. n=10，95% CI 上界顶到 1.0，区间的收窄程度配不上点估计的涨幅，不构成硬结论。
 
 完整过程见 [CLAUDE.md](CLAUDE.md) §6 修订记录与 [data/agreement_interpretation.md](data/agreement_interpretation.md)。
 
 **第一红线是「禁止编造任何指标」**：README 与简历里出现的每个数字，
 都必须能由仓库里的一条命令重新跑出来。填不出来就说明那块还没做完，不许提前填。
-多轮一致性那格留白正是这条红线的体现——没有当前快照支持的数字，宁可空着也不编。
+多轮一致性那格留白、kappa 那格标「不可复现」，都是这条红线的体现——没有当前快照支持的数字，宁可空着也不编。
 
 复现全量评测（需要 `DEEPSEEK_API_KEY`，会产生费用）：
 
@@ -167,6 +173,13 @@ python -m src.eval.report --gate     # 本地跑三道闸（A/B/C），等价于
   fixture 基线（闸 A 逐位比对）、`RUBRIC_VERSION` 或 config 阈值，全都会出现在 diff 里。
 - **fixture 不复制 corpus 原文**：门禁只用 `doc_id` 判 recall，把 chunk 全文
   塞进 git 既无必要，也等于把语料再落一份。
+- **拦下之后怎么办：登记，不调阈值。** 闸 B 第一次拦下真实下跌是 2026-09-12
+  （任务成功率 0.917 → 0.750，原文存档 `reports/gate_fail_20260912T081718Z.txt`）。
+  处理方式不是调低容差、不是重写基线、也不是回退 `latest.json`，而是在
+  `reports/gate_accepted_regressions.json` 登记一条：哪一对快照、哪个指标、跌前跌后的数值、
+  日期、原因、接受人。登记只对那一对快照生效，下次 latest 再跌照样 fail；门禁输出里
+  该项标 `accepted` 并打印原因。这次登记的原因是「历史快照未记录响应模型归属，归因不可行」
+  （见 [LIMITATIONS.md](LIMITATIONS.md) 第 4/16/18 条）。
 
 ### 闸 C · 稳定性闸（同一输入重复 k 次）
 
@@ -244,6 +257,10 @@ benchmark 原题**。理由很直接：公开题目大概率已经进了模型�
 
 - **密钥安全**：API key 只从环境变量 `DEEPSEEK_API_KEY` 读，`.env` 已被 gitignore，
   并且有一条常驻测试 (`tests/test_secrets.py`) 扫描全仓库，一旦有人把 key 粘进代码就直接红。
+- **脱敏与历史**：本机路径自 `c95c4b5` 起在语料源头与派生文档脱敏；此前的已推送提交保留原样，
+  不改写历史（保全提交时间线的可追溯性；该路径不含凭据与个人身份信息）。push 前用
+  `python -m scripts.security_scan --history` 扫 key 模式、本机路径、`.env` 与全部历史提交，
+  豁免项在脚本里逐条带出处。详见 [LIMITATIONS.md](LIMITATIONS.md) 第 17 条。
 - **不外发数据**：除对 DeepSeek 的模型调用外没有任何外部请求；
   `langsmith`（langchain-core 的传递依赖）的追踪上报在 `src/config.py` 里被显式关闭。
 - **CI 不调真实 API**：GitHub Actions 上不放 key，LLM 调用全部打桩或读冻结轨迹，
