@@ -21,9 +21,12 @@
 （= `make stability`，本机无 make）；只重算不重跑：`python -m stability.analyze --raw … --judge …`。
 规格文件在仓库外（本机 `PERF_SPEC.md`，路径不入库）。
 
-### 0.1 你接手时的工作区：**有未提交改动，且明确要求不 commit、不 push**
+### 0.1 本轮改动清单（已于 2026-09-12 提交并推送）
 
-`git status` 里的每一个文件（截至 2026-09-12 09:30 UTC，基线 commit `56021c7`）：
+下表是 2026-09-12 这一轮在 `56021c7` 之上的全部改动，已拆成三个 commit 推到 `origin/main`：
+`6f7fc94 feat(eval)` 工具与机制、`467c3b5 data(eval)` 本次调查的产物与结论、`b23014a docs` 文档。
+拆开是为了不让 5511 行的 latest.json 淹没机制改动。每个 commit 都在干净 worktree 里单独验证过
+（pytest 全绿、`--gate` PASS、安全扫描 PASS）。表中「状态」列是相对 `56021c7` 的 M / 新：
 
 | 文件 | 状态 | 改了什么 |
 |---|---|---|
@@ -144,11 +147,11 @@ pass（2.44–2.69s）。已核查：各 pass 单次 LLM 调用 P50 接近（相
   `meta.served`，没有就「未记录」），agreement 为空时打印「本快照不含此节」；report.md 已按新渲染重生成。
 - `index/` 早于语料脱敏（见 §五），重建会移动 doc_id，需先全量重扫标注；未做。
 - 09-11 的 50 条裁判分没有响应字段（`judge_runs.py` 现已记录，下次运行起生效）。
-- **未 commit、未 push**（工作区如 0.1）。
+- 行尾：`stability/instrument.py` / `stability/records.py` 工作区为 LF（git autocrlf 提示），留待单独 commit。
 
 ### 0.7 下一步（建议顺序）
 
-1. 由项目负责人决定是否接受本次工作区改动并提交（提交信息要写明：为什么加探针、闸 B 文件名匹配为何收紧）。
+1. ~~由项目负责人决定是否接受本次工作区改动并提交~~ 已提交并推送（见 0.1 与 §一）。
 2. 决定被测模型名的处理：`config.MODEL_NAME` / `JUDGE_MODEL_NAME` 改为端点实际列出的名字，
    还是保留旧名并在报告里持续标注响应名。改名会触发闸 A 之外的一切口径讨论，先问再动。
 3. ~~若要让 0.917→0.750 进入门禁~~ 已做（见 0.3）：闸 B 拦下并存档，下跌登记为已接受的回归；
@@ -173,10 +176,13 @@ pass（2.44–2.69s）。已核查：各 pass 单次 LLM 调用 P50 接近（相
 
 - `pytest -m "not live"` **309 项全绿**
 - `python -m src.eval.report --gate` **PASS**（闸 A 口径闸 + 闸 B 回归闸）
-- **已推送到 GitHub**（本条原写「尚未推到 GitHub」，2026-09-12 更正）：`origin` =
-  `github.com/2181385109/rag-agent-eval-harness`，`origin/main` = `78b5122`（`git ls-remote` 确认）；
-  本地 `main` 领先 4 个 commit 未推（`0aa2d57` `b79c6f6` `450a893` `56021c7`，stability 那批）。
+- **已推送到 GitHub，本地与远程一致，无领先 commit**：`origin` = `github.com/2181385109/rag-agent-eval-harness`。
+  2026-09-12 push 后 `git ls-remote` 确认 `origin/main` = `b23014a`（tag `v0.2-attribution`）；本句所在的
+  docs 提交随后推送，push 后再次核对本地 `main` 与 `origin/main` 相同。两个 tag 已推到远程：
+  `v0.1-pre-attribution` = `78b5122`（模型归属核验建立之前，指标无响应模型记录），
+  `v0.2-attribution` = `b23014a`（模型归属核验建立、历史指标复现性调查完成、回归闸首次拦下真实落差）。
   `corpus/` 两份规格书已在 `origin/main` 里，即已公开。历史脱敏状态见 LIMITATIONS 第 17 条。
+  （本条原写「尚未推到 GitHub」，2026-09-12 更正。）
 - v2（安全红队 / FastAPI+Streamlit demo / MLflow / rerank）**一律不碰**，见 CLAUDE.md §11。
 
 ### 封版的三个 commit
