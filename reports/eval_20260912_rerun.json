@@ -1,0 +1,2564 @@
+{
+  "meta": {
+    "timestamp_utc": "2026-09-12T03:21:01+00:00",
+    "git_commit": "56021c7",
+    "model": "deepseek-chat",
+    "embedding_model": "BAAI/bge-large-zh-v1.5",
+    "use_query_instruction": true,
+    "retrieve_top_k": 4,
+    "chunk_size": 500,
+    "chunk_overlap": 80,
+    "max_agent_steps": 6,
+    "temperature": 0.0,
+    "golden_set_size": 36,
+    "notes": "对照重跑：单次运行，另存快照，不写 latest.json；started 2026-09-12T03:18:44+00:00",
+    "requested_model": "deepseek-chat",
+    "served_models": [
+      "deepseek-flash"
+    ],
+    "system_fingerprints": [
+      "aeb56401ca74e127821c4f9126dcb669"
+    ],
+    "judge_requested_model": "deepseek-reasoner",
+    "judge_served_models": [
+      "deepseek-flash"
+    ],
+    "judge_system_fingerprints": [
+      "aeb56401ca74e127821c4f9126dcb669"
+    ],
+    "rerun_of": "reports/latest.json"
+  },
+  "metrics": {
+    "recall_at_k": {
+      "name": "recall_at_k",
+      "value": 0.8709677419354839,
+      "n": 31,
+      "total": 36,
+      "detail": {
+        "cap_001": 1.0,
+        "cap_002": 1.0,
+        "cap_003": 1.0,
+        "cap_004": 1.0,
+        "cap_005": 1.0,
+        "cap_006": 1.0,
+        "cap_007": 1.0,
+        "cap_008": 1.0,
+        "cap_009": null,
+        "cap_010": null,
+        "cap_011": 1.0,
+        "cap_012": 1.0,
+        "cap_013": 1.0,
+        "cap_014": 1.0,
+        "cap_015": 0.0,
+        "cap_016": 0.0,
+        "cap_017": 1.0,
+        "cap_018": 1.0,
+        "cap_019": 1.0,
+        "cap_020": 1.0,
+        "cap_021": 1.0,
+        "cap_022": 1.0,
+        "cap_023": 1.0,
+        "cap_024": 1.0,
+        "cap_025": 1.0,
+        "cap_026": 1.0,
+        "cap_027": 0.0,
+        "cap_028": 1.0,
+        "cap_029": 1.0,
+        "cap_030": 1.0,
+        "cap_031": 1.0,
+        "cap_032": 1.0,
+        "cap_033": null,
+        "cap_034": null,
+        "cap_035": 0.0,
+        "cap_036": null
+      }
+    },
+    "recall_at_k_first_call": {
+      "name": "recall_at_k_first_call",
+      "value": 0.7741935483870968,
+      "n": 31,
+      "total": 36,
+      "detail": {
+        "cap_001": 1.0,
+        "cap_002": 1.0,
+        "cap_003": 1.0,
+        "cap_004": 1.0,
+        "cap_005": 1.0,
+        "cap_006": 1.0,
+        "cap_007": 0.0,
+        "cap_008": 0.0,
+        "cap_009": null,
+        "cap_010": null,
+        "cap_011": 1.0,
+        "cap_012": 1.0,
+        "cap_013": 1.0,
+        "cap_014": 1.0,
+        "cap_015": 0.0,
+        "cap_016": 0.0,
+        "cap_017": 1.0,
+        "cap_018": 1.0,
+        "cap_019": 1.0,
+        "cap_020": 0.0,
+        "cap_021": 1.0,
+        "cap_022": 1.0,
+        "cap_023": 1.0,
+        "cap_024": 1.0,
+        "cap_025": 1.0,
+        "cap_026": 1.0,
+        "cap_027": 0.0,
+        "cap_028": 1.0,
+        "cap_029": 1.0,
+        "cap_030": 1.0,
+        "cap_031": 1.0,
+        "cap_032": 1.0,
+        "cap_033": null,
+        "cap_034": null,
+        "cap_035": 0.0,
+        "cap_036": null
+      }
+    },
+    "task_success_rate": {
+      "name": "task_success_rate",
+      "value": 0.75,
+      "n": 36,
+      "total": 36,
+      "detail": {
+        "cap_001": true,
+        "cap_002": true,
+        "cap_003": true,
+        "cap_004": true,
+        "cap_005": true,
+        "cap_006": true,
+        "cap_007": false,
+        "cap_008": true,
+        "cap_009": true,
+        "cap_010": true,
+        "cap_011": true,
+        "cap_012": true,
+        "cap_013": true,
+        "cap_014": true,
+        "cap_015": false,
+        "cap_016": false,
+        "cap_017": false,
+        "cap_018": true,
+        "cap_019": true,
+        "cap_020": false,
+        "cap_021": true,
+        "cap_022": true,
+        "cap_023": true,
+        "cap_024": true,
+        "cap_025": true,
+        "cap_026": true,
+        "cap_027": false,
+        "cap_028": true,
+        "cap_029": true,
+        "cap_030": true,
+        "cap_031": true,
+        "cap_032": false,
+        "cap_033": true,
+        "cap_034": true,
+        "cap_035": false,
+        "cap_036": false
+      },
+      "meta": {
+        "rule": "closed: answer_keys 全部命中; open: judge_score >= 2",
+        "open_threshold": 2,
+        "n_rule_judged": 26,
+        "n_judge_judged": 10,
+        "unjudged": [],
+        "source": {
+          "cap_001": "rule",
+          "cap_002": "rule",
+          "cap_003": "rule",
+          "cap_004": "rule",
+          "cap_005": "rule",
+          "cap_006": "rule",
+          "cap_007": "judge",
+          "cap_008": "judge",
+          "cap_009": "rule",
+          "cap_010": "judge",
+          "cap_011": "rule",
+          "cap_012": "rule",
+          "cap_013": "rule",
+          "cap_014": "rule",
+          "cap_015": "rule",
+          "cap_016": "rule",
+          "cap_017": "judge",
+          "cap_018": "rule",
+          "cap_019": "rule",
+          "cap_020": "judge",
+          "cap_021": "rule",
+          "cap_022": "judge",
+          "cap_023": "rule",
+          "cap_024": "rule",
+          "cap_025": "rule",
+          "cap_026": "judge",
+          "cap_027": "rule",
+          "cap_028": "rule",
+          "cap_029": "rule",
+          "cap_030": "rule",
+          "cap_031": "rule",
+          "cap_032": "judge",
+          "cap_033": "rule",
+          "cap_034": "rule",
+          "cap_035": "judge",
+          "cap_036": "judge"
+        }
+      },
+      "backfill": {
+        "source": "reports/judge_scores_20260912_rerun.jsonl",
+        "judge_model": "deepseek-reasoner",
+        "rubric_version": "v2-要点级",
+        "open_threshold": 2,
+        "n_rows": 10,
+        "verified": [
+          "cap_007",
+          "cap_008",
+          "cap_010",
+          "cap_017",
+          "cap_020",
+          "cap_022",
+          "cap_026",
+          "cap_032",
+          "cap_035",
+          "cap_036"
+        ],
+        "unverified": [],
+        "stale": []
+      }
+    },
+    "tool_accuracy": {
+      "name": "tool_accuracy",
+      "value": 1.0,
+      "n": 36,
+      "total": 36,
+      "detail": {
+        "cap_001": true,
+        "cap_002": true,
+        "cap_003": true,
+        "cap_004": true,
+        "cap_005": true,
+        "cap_006": true,
+        "cap_007": true,
+        "cap_008": true,
+        "cap_009": true,
+        "cap_010": true,
+        "cap_011": true,
+        "cap_012": true,
+        "cap_013": true,
+        "cap_014": true,
+        "cap_015": true,
+        "cap_016": true,
+        "cap_017": true,
+        "cap_018": true,
+        "cap_019": true,
+        "cap_020": true,
+        "cap_021": true,
+        "cap_022": true,
+        "cap_023": true,
+        "cap_024": true,
+        "cap_025": true,
+        "cap_026": true,
+        "cap_027": true,
+        "cap_028": true,
+        "cap_029": true,
+        "cap_030": true,
+        "cap_031": true,
+        "cap_032": true,
+        "cap_033": true,
+        "cap_034": true,
+        "cap_035": true,
+        "cap_036": true
+      }
+    },
+    "tool_set_accuracy": {
+      "name": "tool_set_accuracy",
+      "value": 1.0,
+      "n": 36,
+      "total": 36,
+      "detail": {
+        "cap_001": true,
+        "cap_002": true,
+        "cap_003": true,
+        "cap_004": true,
+        "cap_005": true,
+        "cap_006": true,
+        "cap_007": true,
+        "cap_008": true,
+        "cap_009": true,
+        "cap_010": true,
+        "cap_011": true,
+        "cap_012": true,
+        "cap_013": true,
+        "cap_014": true,
+        "cap_015": true,
+        "cap_016": true,
+        "cap_017": true,
+        "cap_018": true,
+        "cap_019": true,
+        "cap_020": true,
+        "cap_021": true,
+        "cap_022": true,
+        "cap_023": true,
+        "cap_024": true,
+        "cap_025": true,
+        "cap_026": true,
+        "cap_027": true,
+        "cap_028": true,
+        "cap_029": true,
+        "cap_030": true,
+        "cap_031": true,
+        "cap_032": true,
+        "cap_033": true,
+        "cap_034": true,
+        "cap_035": true,
+        "cap_036": true
+      }
+    },
+    "consistency": null,
+    "consistency_hot": null,
+    "ragas": null,
+    "ragas_baseline": null,
+    "agreement": null,
+    "judge_revision": null
+  },
+  "tokens": {
+    "prompt": 101275,
+    "completion": 8261,
+    "total": 109536
+  },
+  "anomalies": [],
+  "per_question": [
+    {
+      "id": "cap_001",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0004",
+          "c730fa5c_0027",
+          "c730fa5c_0039"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0027",
+        "c730fa5c_0028",
+        "c730fa5c_0004",
+        "c730fa5c_0037"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "按项目技术规格书的约定，PSI 阈值分三档：\n\n- **< 0.1**：稳定\n- **0.1 ~ 0.25**：轻微漂移\n- **> 0.25**：显著漂移，触发告警\n\n阈值放在 config 中可配置。验收要求是：注入漂移后，显著特征的 PSI 越过告警线（>0.25）并被标记。",
+      "tool_sequence_raw": [
+        "retrieve"
+      ],
+      "n_retrieve_calls": 1,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0027",
+        "c730fa5c_0028",
+        "c730fa5c_0004",
+        "c730fa5c_0037"
+      ],
+      "retrieve_queries": [
+        "信贷风控 PSI 显著漂移 告警 阈值"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        2.7981061000027694,
+        1.4457458999968367
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1408
+      ]
+    },
+    {
+      "id": "cap_002",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0018",
+          "c730fa5c_0039"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0018",
+        "c730fa5c_0021",
+        "c730fa5c_0023",
+        "c730fa5c_0037"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "根据技术规格书，Give Me Some Credit 数据集的标签 `SeriousDlqin2yrs`（1 = 两年内发生 90 天以上逾期，即正类）**约占 6~7%**，属于天然不平衡数据。\n\n补充几点相关背景（同样来自规格书）：\n- 训练集 `cs-training.csv` 约 15 万行。\n- 正因为正类占比低，项目里专门安排了不平衡处理，并且评估指标除 AUC 外还强调 **PR-AUC**（对不平衡更敏感）。\n- 已知数据问题：`MonthlyIncome`、`NumberOfDependents` 有缺失；逾期次数字段存在哨兵值（如 96/98）；使用率与负债比有极端离群值。\n\n注：规格书给的是\"约 6~7%\"这一区间，未给出更精确的数值。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0018",
+        "c730fa5c_0021",
+        "c730fa5c_0023",
+        "c730fa5c_0037"
+      ],
+      "retrieve_queries": [
+        "Give Me Some Credit 数据集 正类 逾期 占比 类别不平衡",
+        "信贷项目 数据集 标签分布 90天以上逾期 比例"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.1368978999962565,
+        1.7692864000127884
+      ],
+      "llm_call_cache_hit": [
+        256,
+        512
+      ]
+    },
+    {
+      "id": "cap_003",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0019"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0026",
+        "c730fa5c_0019",
+        "c730fa5c_0029",
+        "c730fa5c_0018",
+        "2da65ad3_0023",
+        "2da65ad3_0028",
+        "2da65ad3_0022",
+        "2da65ad3_0018"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "**信贷项目（Give Me Some Credit）的切分与防泄露做法：**\n\n**切分比例**\n- 官方测试集无标签，因此**只用 `cs-training.csv`**（约 15 万行）。\n- 按标签**分层切分**为 **训练/验证/测试 = 70/15/15**，用 `stratify` 保持正类比例一致（正类 `SeriousDlqin2yrs` 约占 6~7%，天然不平衡）。\n\n**防泄露手段**\n1. **分层切分**：保证三集正类比例一致。\n2. **统计量只在训练集 fit**：所有填补、截断、编码的统计量只在训练集上拟合，再 `transform` 验证集和测试集。\n3. **固定 seed**：保证完全可复现。\n4. 测试要求中明确校验：切分分层正确、正类比例三集一致、预处理统计仅来自训练集、seed 可复现。\n\n（注：知识库中另有一个\"航班延误预测\"项目，采用时间序切分 80/20 + 按 `tail_id` 的 GroupKFold，并用 out-of-fold 计算统计特征防泄露——那是另一个项目，与信贷项目不同。）",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0026",
+        "c730fa5c_0019",
+        "c730fa5c_0029",
+        "c730fa5c_0018"
+      ],
+      "retrieve_queries": [
+        "信贷项目 训练集 验证集 测试集 切分比例",
+        "防止数据泄露 手段 时间切分"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.3893936999957077,
+        1.9116747999942163
+      ],
+      "llm_call_cache_hit": [
+        256,
+        512
+      ]
+    },
+    {
+      "id": "cap_004",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0021"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0021",
+        "2da65ad3_0018",
+        "2da65ad3_0008",
+        "2da65ad3_0022",
+        "2da65ad3_0025",
+        "2da65ad3_0019",
+        "2da65ad3_0024"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "**20%–35%**。\n\n依据技术规格书 6.1 节合成数据生成器（`data/synth.py`）：系数 `a*`、`sigma` 放入 config，取值需使 `is_delayed15` 正类占比落在 **20%–35%**，且各特征均有可辨识信号。验收标准中也要求\"正类比例在区间\"。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0021",
+        "2da65ad3_0018",
+        "2da65ad3_0008",
+        "2da65ad3_0022"
+      ],
+      "retrieve_queries": [
+        "航班延误 合成数据生成器 is_delayed15 正类占比 区间",
+        "is_delayed15 分类标签 正类比例 要求"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.9261909000051674,
+        1.0745169000001624
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1920
+      ]
+    },
+    {
+      "id": "cap_005",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0028"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0008",
+        "2da65ad3_0003",
+        "2da65ad3_0028",
+        "2da65ad3_0004",
+        "2da65ad3_0027",
+        "c730fa5c_0021",
+        "2da65ad3_0036"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "**切分点**：以预测延误值（或分类概率，二选一并在文档中说明）在**训练集**上的 **20 / 40 / 60 / 80 分位点**为切点，切成 5 级 L1–L5。\n\n**高风险等级**：**L4 和 L5**。\n\n补充要点：\n- 切点由训练集确定（`fit_quantiles(train_pred) -> cutpoints`），测试集复用同一组切点（`grade(pred, cutpoints) -> labels`）。\n- 验收要求：各级样本量大致均衡；高风险 Recall ≥ 0.80，且显著高于单一规则基线。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0008",
+        "2da65ad3_0003",
+        "2da65ad3_0028",
+        "2da65ad3_0004"
+      ],
+      "retrieve_queries": [
+        "航班延误项目 风险分级 分位点 5级 高风险",
+        "风险分级 分位数 切分 等级划分"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.2265594999917084,
+        1.2343530999933137
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2176
+      ]
+    },
+    {
+      "id": "cap_006",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve",
+        "calc"
+      ],
+      "actual_tool": [
+        "retrieve",
+        "calc"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0027"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0027",
+        "c730fa5c_0028",
+        "c730fa5c_0004",
+        "c730fa5c_0037",
+        "c730fa5c_0034"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "差值是 **0.15**（0.25 − 0.1）。\n\n依据：技术规格书第 11 节漂移监控规格中约定 PSI 阈值 `<0.1` 稳定、`0.1~0.25` 轻微、`>0.25` 显著漂移。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve",
+        "calc"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0027",
+        "c730fa5c_0028",
+        "c730fa5c_0004",
+        "c730fa5c_0037"
+      ],
+      "retrieve_queries": [
+        "信贷项目 PSI 显著漂移阈值 轻微漂移区间",
+        "PSI 阈值 0.1 0.25 漂移程度划分"
+      ],
+      "n_steps": 3,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.8544368000002578,
+        1.1458568000089144,
+        0.7177932000049623
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2304,
+        2432
+      ]
+    },
+    {
+      "id": "cap_007",
+      "answer_type": "open",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0008",
+          "c730fa5c_0019",
+          "c730fa5c_0021"
+        ],
+        [
+          "2da65ad3_0005",
+          "2da65ad3_0023",
+          "2da65ad3_0026"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0010",
+        "c730fa5c_0035",
+        "c730fa5c_0037",
+        "c730fa5c_0018",
+        "2da65ad3_0003",
+        "2da65ad3_0008",
+        "2da65ad3_0018",
+        "2da65ad3_0000",
+        "2da65ad3_0023",
+        "c730fa5c_0021",
+        "c730fa5c_0005",
+        "2da65ad3_0022",
+        "2da65ad3_0031",
+        "c730fa5c_0008"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 0.0,
+      "success": false,
+      "success_source": "judge",
+      "stop_reason": "answered",
+      "answer": "两个项目防数据泄露的做法如下（依据知识库中的技术规格书）：\n\n## 信贷风控项目（credit-risk-mlops）\n\n1. **数据切分防泄露**：在数据层按行**分层切分**训练/验证/测试集，明确标注\"防泄露\"。\n2. **预处理器接口约束**：`Preprocessor.fit(X_train)` 只在训练集上拟合，再 `transform(X)` 应用到其他数据；预处理器可序列化（joblib 存到 `outputs/models/preprocessor.pkl`）并复用。验收标准明确要求\"**无泄露**\"。\n3. **缺失/异常处理**：缺失用中位数/分组中位数、众数填补并加\"是否缺失\"指示位；哨兵值（96/98）截断或单独成桶；极端离群值按分位数（如 99%）截断——这些统计量都应在训练集上确定。\n4. **发布层面防泄露**：`.gitignore` 排除 `data/raw/`、`data/processed/`、`*.csv`、`mlruns/`、`outputs/models/`、`*.pkl`、`.env` 等，数据与模型工件不提交到 GitHub。\n\n## 航班延误项目\n\n1. **特征工程明确\"严禁数据泄露\"**，7 个核心特征 + 3 个交互特征均按防泄露设计：\n   - `airport_congestion`：只用**计划信息**（起飞时刻 ±30min 窗口内计划起飞架次），不含实际结果。\n   - `carrier_ontime_rate`（承运人历史准点率）：用 **out-of-fold / 仅训练集统计**，在交叉验证内部计算，避免用未来或全量数据。\n2. **数据生成与切分**：合成数据固定 seed 保证可复现；`prev_leg_delay` 等延误传播特征基于机尾串接的历史航段，属于可用信息。\n\n## 小结\n\n两者共同点是：**统计量只在训练集/折内拟合**（信贷用分层切分 + fit 仅训练集；航班用 out-of-fold 统计），并**在发布时排除原始数据与模型工件**。差异在于信贷侧重\"切分 + 预处理器序列化复用\"，航班侧重\"特征构造时只用计划信息、历史统计走 OOF\"。\n\n需要我进一步展开某个项目的具体实现细节吗？",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve",
+        "retrieve",
+        "retrieve",
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 6,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0010",
+        "c730fa5c_0035",
+        "c730fa5c_0037",
+        "c730fa5c_0018"
+      ],
+      "retrieve_queries": [
+        "信贷风控项目 防止数据泄露",
+        "航班延误项目 防止数据泄露",
+        "信贷风控 特征工程 防泄露 时间切分 数据泄漏",
+        "航班延误 特征 防泄露 交互特征 时间切分",
+        "航班延误 交叉验证 out-of-fold 训练集统计 防泄露",
+        "信贷风控 训练 交叉验证 划分 防泄露 预处理 fit"
+      ],
+      "n_steps": 4,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash",
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.004120099998545,
+        1.0551275000034366,
+        1.1563843000039924,
+        3.175719399994705
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1920,
+        4096,
+        6144
+      ]
+    },
+    {
+      "id": "cap_008",
+      "answer_type": "open",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0039"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0021",
+        "c730fa5c_0018",
+        "c730fa5c_0023",
+        "c730fa5c_0004",
+        "2da65ad3_0004",
+        "c730fa5c_0039",
+        "c730fa5c_0027"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 0.0,
+      "success": true,
+      "success_source": "judge",
+      "stop_reason": "answered",
+      "answer": "**为什么不能看准确率**\n\n在信贷违约场景里，正类（违约）只占约 6~7%，天然不平衡。如果模型把所有样本都预测成\"不违约\"，准确率也有约 94%，但这个模型毫无用处——它一个违约客户都抓不到。准确率被多数类主导，无法反映模型对少数类（真正关心的违约）的识别能力。\n\n**应该看什么指标**\n\n按知识库里的规格，核心指标是：\n\n| 指标 | 定义 | 作用 |\n|---|---|---|\n| **AUC** | ROC-AUC | 衡量排序能力，对不平衡稳健；参考量级 ~0.86 |\n| **KS** | max(TPR − FPR)，好坏样本累积分布之差的最大值 | 风控行业标准，衡量把违约/不违约拉开的能力 |\n| **PR-AUC** | 精确率-召回率曲线下面积 | 不平衡场景更看重 |\n| **混淆矩阵 / 精确率 / 召回率** | 在指定阈值下计算 | 结合业务代价选阈值 |\n| **校准曲线** | 预测概率与实际违约率的一致性 | 概率要能直接用于定价/决策 |\n\n另外，阈值选择上建议按 **KS 最大点**或**业务代价**来定，而不是默认 0.5；线上还要用 **PSI** 监控分布漂移（>0.25 触发告警），并在有标签的新数据上重算 AUC/KS 观察性能衰减。\n\n一句话：不平衡场景下要看**关注少数类、且衡量排序/分离能力**的指标（AUC、PR-AUC、KS、召回率等），而不是被多数类主导的准确率。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0021",
+        "c730fa5c_0018",
+        "c730fa5c_0023",
+        "c730fa5c_0004"
+      ],
+      "retrieve_queries": [
+        "信贷违约 类别不平衡 准确率 评估指标",
+        "不平衡数据 评估指标 AUC 召回率 精确率 F1"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.0382351000007475,
+        2.5008539999980712
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2556
+      ]
+    },
+    {
+      "id": "cap_009",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "calc"
+      ],
+      "actual_tool": [
+        "calc"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [],
+      "retrieved_doc_ids": [],
+      "recall_at_k": null,
+      "recall_at_k_first_call": null,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "绝对提升是 **0.025**（即 2.5 个百分点）。",
+      "tool_sequence_raw": [
+        "calc"
+      ],
+      "n_retrieve_calls": 0,
+      "first_retrieve_doc_ids": [],
+      "retrieve_queries": [],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.9720268999953987,
+        0.830367100003059
+      ],
+      "llm_call_cache_hit": [
+        256,
+        384
+      ]
+    },
+    {
+      "id": "cap_010",
+      "answer_type": "open",
+      "failure_tag": "hallucination_bait",
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [],
+      "retrieved_doc_ids": [
+        "c730fa5c_0000",
+        "c730fa5c_0021",
+        "c730fa5c_0005",
+        "c730fa5c_0035",
+        "c730fa5c_0020",
+        "2da65ad3_0023",
+        "2da65ad3_0024",
+        "2da65ad3_0005"
+      ],
+      "recall_at_k": null,
+      "recall_at_k_first_call": null,
+      "success": true,
+      "success_source": "judge",
+      "stop_reason": "answered",
+      "answer": "没有。检索到的技术规格书中，**没有指定用 Redis 做特征存储**。\n\n规格书里与\"存储/服务\"相关的指定是：\n\n- **特征工程**：做一个可序列化的预处理器（`fit`/`transform`），用 **joblib** 序列化到 `outputs/models/preprocessor.pkl`，保证训练与线上服务用同一套变换。\n- **服务化**：**FastAPI** + Pydantic 校验 + Uvicorn。\n- **实验追踪**：**MLflow**（本地 file-based，含 Model Registry）。\n- **容器化**：Docker（可选 docker-compose 同起 API 与 MLflow UI）。\n\n全文未出现 Redis 或任何在线特征存储（feature store）组件的选型。如果你需要引入 Redis，那属于规格书之外的扩展，需要另行确认。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0000",
+        "c730fa5c_0021",
+        "c730fa5c_0005",
+        "c730fa5c_0035"
+      ],
+      "retrieve_queries": [
+        "信贷风控项目 技术规格书 特征存储 Redis",
+        "特征存储 选型 技术方案"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.156498799988185,
+        1.4149924999946961
+      ],
+      "llm_call_cache_hit": [
+        256,
+        512
+      ]
+    },
+    {
+      "id": "cap_011",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0005",
+          "c730fa5c_0022"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0005",
+        "c730fa5c_0004",
+        "c730fa5c_0039",
+        "2da65ad3_0004",
+        "2da65ad3_0027"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "信贷风控项目（`信贷风控端到端ML系统_技术规格书`）的相关设定如下：\n\n- **主模型**：**LightGBM**（二分类）。选它的理由是表格数据表现强、速度快、CPU 友好。\n- **类别不平衡处理**：用 **`scale_pos_weight`** 参数处理不平衡。\n- **对照基线**：**逻辑回归**（评估表中还提到\"逻辑回归 / 常数基线\"）。\n\n补充：调参用 Optuna（20~50 trial，目标 AUC）；评估指标为 AUC / KS / PR-AUC / 混淆矩阵 / 校准 + 评分卡映射，其中 AUC、KS、PR-AUC 均以逻辑回归为对照基线。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0005",
+        "c730fa5c_0004",
+        "c730fa5c_0039",
+        "2da65ad3_0004"
+      ],
+      "retrieve_queries": [
+        "信贷风控项目 主模型 类别不平衡 参数 基线模型",
+        "风控 主模型 类别不平衡 class_weight 对照基线"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.1260984999971697,
+        1.0602739000023575
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2432
+      ]
+    },
+    {
+      "id": "cap_012",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0018",
+          "c730fa5c_0021"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0018",
+        "c730fa5c_0021",
+        "c730fa5c_0023",
+        "c730fa5c_0025"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "逾期次数字段存在的异常哨兵值是 **96 和 98**。",
+      "tool_sequence_raw": [
+        "retrieve"
+      ],
+      "n_retrieve_calls": 1,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0018",
+        "c730fa5c_0021",
+        "c730fa5c_0023",
+        "c730fa5c_0025"
+      ],
+      "retrieve_queries": [
+        "信贷数据 逾期次数 异常哨兵值"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.9963415999955032,
+        0.7647822999861091
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1408
+      ]
+    },
+    {
+      "id": "cap_013",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0023"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0023",
+        "c730fa5c_0010",
+        "c730fa5c_0003",
+        "c730fa5c_0008",
+        "c730fa5c_0001",
+        "c730fa5c_0035"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "信贷项目的最优模型在 MLflow Model Registry 里注册的名字是 **`credit-risk-model`**，并会打上 stage 标记（如 `Staging`/`Production`）。\n\n依据：技术规格书第 8.2 节「MLflow 追踪与注册」——\"用 **Model Registry** 注册最优模型为 `credit-risk-model`，打 stage 标记（如 `Staging`/`Production`）\"。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0023",
+        "c730fa5c_0010",
+        "c730fa5c_0003",
+        "c730fa5c_0008"
+      ],
+      "retrieve_queries": [
+        "信贷项目 最优模型 MLflow Model Registry 注册名称",
+        "MLflow Model Registry registered model name credit project best model"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.1167757000075653,
+        1.0639733000134584
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2176
+      ]
+    },
+    {
+      "id": "cap_014",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0025"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0021",
+        "c730fa5c_0025",
+        "c730fa5c_0035",
+        "c730fa5c_0010"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "根据技术规格书，`POST /predict` 返回四个字段：\n\n- `default_probability`（违约概率）\n- `credit_score`（信用分）\n- `risk_level`（风险等级）\n- `top_reasons`（主要影响因子，用 SHAP 给出）\n\n入参为单个申请人的原始字段，经 Pydantic 校验类型/范围；非法输入返回 422。",
+      "tool_sequence_raw": [
+        "retrieve"
+      ],
+      "n_retrieve_calls": 1,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0021",
+        "c730fa5c_0025",
+        "c730fa5c_0035",
+        "c730fa5c_0010"
+      ],
+      "retrieve_queries": [
+        "信贷项目 POST /predict 接口 返回字段"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.9452911999978824,
+        0.8631560999929206
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1152
+      ]
+    },
+    {
+      "id": "cap_015",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0026"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0035",
+        "c730fa5c_0011",
+        "c730fa5c_0010",
+        "c730fa5c_0017"
+      ],
+      "recall_at_k": 0.0,
+      "recall_at_k_first_call": 0.0,
+      "success": false,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "检索到的内容只提到项目里有 `Dockerfile`（服务镜像），但没有说明它基于哪个基础镜像。知识库中没有相关信息，我无法回答这个问题。",
+      "tool_sequence_raw": [
+        "retrieve"
+      ],
+      "n_retrieve_calls": 1,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0035",
+        "c730fa5c_0011",
+        "c730fa5c_0010",
+        "c730fa5c_0017"
+      ],
+      "retrieve_queries": [
+        "信贷项目 Dockerfile 基础镜像"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.3400151999958325,
+        0.8991907000017818
+      ],
+      "llm_call_cache_hit": [
+        256,
+        896
+      ]
+    },
+    {
+      "id": "cap_016",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0032"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0016",
+        "c730fa5c_0035",
+        "c730fa5c_0001",
+        "c730fa5c_0011",
+        "c730fa5c_0010",
+        "c730fa5c_0025",
+        "c730fa5c_0018"
+      ],
+      "recall_at_k": 0.0,
+      "recall_at_k_first_call": 0.0,
+      "success": false,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "检索到的内容只提到 `.github/workflows/ci.yml` 是「ruff + pytest（+可选 docker build）」，但**没有说明具体的操作系统和 Python 版本**。\n\n因此：\n\n- **跑哪两个检查**：`ruff`（代码检查）和 `pytest`（测试），另有一个可选的 `docker build`。\n- **操作系统和 Python 版本**：知识库中没有相关记载，我无法确认。文档只说明项目本身全程使用 Python 3.11、需在 Windows 下正常工作，但这不等于 CI 的运行环境配置。\n\n如需准确答案，建议直接查看仓库中的 `.github/workflows/ci.yml` 文件。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0016",
+        "c730fa5c_0035",
+        "c730fa5c_0001",
+        "c730fa5c_0011"
+      ],
+      "retrieve_queries": [
+        "信贷项目 GitHub Actions CI 操作系统 Python 版本",
+        "信贷项目 CI 检查 步骤 测试"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.015354599992861,
+        1.5761655000096653
+      ],
+      "llm_call_cache_hit": [
+        256,
+        512
+      ]
+    },
+    {
+      "id": "cap_017",
+      "answer_type": "open",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0004",
+          "c730fa5c_0039"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0005",
+        "c730fa5c_0039",
+        "c730fa5c_0023",
+        "2da65ad3_0004",
+        "c730fa5c_0000"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": false,
+      "success_source": "judge",
+      "stop_reason": "answered",
+      "answer": "**KS（Kolmogorov-Smirnov）指标**：好坏样本累积分布之差的最大值，衡量模型把\"违约\"和\"不违约\"两类样本拉开的能力。\n\n**为什么风控行业要用它：**\n\n1. **对不平衡数据稳健**。风控场景正类（违约）占比很低（如约 6%），全预测为\"不违约\"准确率也有 94% 却毫无用处。KS 关注的是排序/分离能力，不受这种类别失衡的误导。\n2. **直观反映区分度**。KS 越大，说明模型越能把好坏客户分开，业务上直接对应\"能不能有效筛出高风险客户\"。\n3. **是风控行业标准**。在信贷风控里，KS 与评分卡映射一样属于行业通用评估口径，便于横向对比和对外沟通。\n4. **可用于定阈值**。实践中常取 KS 最大点作为切分阈值的参考（或结合业务代价调整）。\n\n补充：风控评估通常还会配合 AUC、PR-AUC、混淆矩阵、校准曲线一起看，KS 只是其中一项核心指标。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0005",
+        "c730fa5c_0039",
+        "c730fa5c_0023",
+        "2da65ad3_0004"
+      ],
+      "retrieve_queries": [
+        "KS 指标 风控 定义",
+        "KS 值 风控模型 评估 为什么使用"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.7653473000100348,
+        1.9496231999946758
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2432
+      ]
+    },
+    {
+      "id": "cap_018",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0021"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0021",
+        "c730fa5c_0018",
+        "c730fa5c_0010",
+        "c730fa5c_0035",
+        "2da65ad3_0021",
+        "2da65ad3_0043",
+        "2da65ad3_0022"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "信贷项目（Give Me Some Credit）中这两个字段的缺失填补方式如下：\n\n- **MonthlyIncome**：用**中位数或分组中位数**填补。\n- **NumberOfDependents**：用**众数或 0** 填补。\n\n两者都需要额外加一个**\"是否缺失\"指示位**（missing indicator）。\n\n另外，规格书还提到相关派生特征：人均月收入 = 收入 /（家属数 + 1），可作为补充信号。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0021",
+        "c730fa5c_0018",
+        "c730fa5c_0010",
+        "c730fa5c_0035"
+      ],
+      "retrieve_queries": [
+        "信贷项目 MonthlyIncome 缺失值填补",
+        "NumberOfDependents 缺失值填补"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.8214923999912571,
+        1.325797199999215
+      ],
+      "llm_call_cache_hit": [
+        256,
+        512
+      ]
+    },
+    {
+      "id": "cap_019",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0021"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0021",
+        "c730fa5c_0018",
+        "c730fa5c_0010",
+        "2da65ad3_0023",
+        "c730fa5c_0027",
+        "c730fa5c_0004",
+        "2da65ad3_0018"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "根据技术规格书，**人均月收入 = 月收入 / (家属人数 + 1)**。\n\n具体说明：\n- 它属于信贷项目「派生特征（少而有信号）」中的一个，同批派生特征还包括总逾期次数、月收入与负债比的交互、年龄分桶。\n- 公式中的「+1」是把借款人本人也算进家庭人口，即分母为「家属人数 + 1」。\n- 相关字段背景：`MonthlyIncome`（月收入）和 `NumberOfDependents`（家属人数）在 Give Me Some Credit 数据集中都存在缺失，规格书要求对 `MonthlyIncome` 用中位数或分组中位数填补、`NumberOfDependents` 用众数或 0 填补，并额外加「是否缺失」指示位——所以计算人均月收入前需先完成这些缺失处理。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0021",
+        "c730fa5c_0018",
+        "c730fa5c_0010",
+        "2da65ad3_0023"
+      ],
+      "retrieve_queries": [
+        "信贷项目 派生特征 人均月收入 计算",
+        "人均月收入 派生变量 口径"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.4849860000103945,
+        1.2014261000003899
+      ],
+      "llm_call_cache_hit": [
+        256,
+        512
+      ]
+    },
+    {
+      "id": "cap_020",
+      "answer_type": "open",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0022"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0018",
+        "c730fa5c_0021",
+        "c730fa5c_0004",
+        "c730fa5c_0023",
+        "c730fa5c_0022",
+        "2da65ad3_0027",
+        "c730fa5c_0005"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 0.0,
+      "success": false,
+      "success_source": "judge",
+      "stop_reason": "answered",
+      "answer": "知识库中确实有这条规定，但只给了结论，没有展开理由。我如实说明：\n\n**知识库中的依据**\n\n技术规格书在建模层（`model.py`）明确写了：\n\n> 主模型 LightGBM（`LGBMClassifier`），用 `scale_pos_weight` 或 `class_weight` 处理不平衡（**优先加权，不首选 SMOTE**；如做 SMOTE 仅作对照并说明）。\n\n技术选型表也对应写着：主模型用 LightGBM，`scale_pos_weight` 处理不平衡。\n\n**关于\"为什么\"**\n\n知识库只给出了\"优先加权、不首选 SMOTE\"这一决策，**没有记录具体理由**。所以严格按知识库，我无法给出官方解释。\n\n不过可以补充一点与知识库相关的背景：该数据集正类（两年内 90 天以上逾期）仅占约 6~7%，属天然不平衡；评估上规格书特别强调 **PR-AUC**（\"不平衡更看重\"），并要求报告 KS、校准曲线。这些是文档里与不平衡处理相关的上下文，但文档并未把它们与\"选加权而非 SMOTE\"直接挂钩。\n\n如果你需要理由层面的论证（例如加权不改变原始分布、不引入合成样本噪声、与概率校准/评分卡映射更兼容等），那属于知识库之外的内容，我不能当作文档结论来陈述。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0018",
+        "c730fa5c_0021",
+        "c730fa5c_0004",
+        "c730fa5c_0023"
+      ],
+      "retrieve_queries": [
+        "信贷项目 类别不平衡 加权 SMOTE",
+        "类别不平衡 处理方式 样本权重 class_weight"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.0602560999977868,
+        2.4646117999946
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2432
+      ]
+    },
+    {
+      "id": "cap_021",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0002",
+          "c730fa5c_0030",
+          "c730fa5c_0037"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0037",
+        "c730fa5c_0030",
+        "c730fa5c_0023",
+        "c730fa5c_0010"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "一键跑通数据到评估全流程的命令是：\n\n```powershell\npython -m creditrisk run-all\n```\n\n它依次执行 `get-data → prep → train → evaluate`（即下载/校验数据 → 清洗切分 → 训练 → 评估）。\n\n其他相关命令：\n- `python -m creditrisk get-data`：下载/校验数据\n- `python -m creditrisk prep`：清洗 + 切分 + 拟合预处理器\n- `python -m creditrisk train`：训练 + Optuna + MLflow 记录/注册\n- `python -m creditrisk evaluate`：指标 + SHAP + 评分卡 + 出图\n- `python -m creditrisk monitor`：PSI 漂移演示",
+      "tool_sequence_raw": [
+        "retrieve"
+      ],
+      "n_retrieve_calls": 1,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0037",
+        "c730fa5c_0030",
+        "c730fa5c_0023",
+        "c730fa5c_0010"
+      ],
+      "retrieve_queries": [
+        "信贷项目 一键跑通 数据到评估 全流程 命令"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.380016400013119,
+        1.4174530000018422
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1152
+      ]
+    },
+    {
+      "id": "cap_022",
+      "answer_type": "open",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0012",
+          "c730fa5c_0035"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0039",
+        "c730fa5c_0036",
+        "c730fa5c_0035",
+        "2da65ad3_0040",
+        "2da65ad3_0012"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "judge",
+      "stop_reason": "answered",
+      "answer": "根据信贷风控项目的技术规格书（19.2 节 `.gitignore`），明确**不提交**的内容有：\n\n**环境与缓存**\n- `.venv/`\n- `__pycache__/`、`*.pyc`\n\n**数据**\n- `data/raw/`、`data/processed/`\n- `*.csv`\n\n**实验与模型产物**\n- `mlruns/`\n- `outputs/models/`\n- `*.pkl`\n\n**图表与本地配置**\n- `outputs/figures/*.html`\n- `.env`\n- `.idea/`、`.vscode/`\n\n规格书还特别强调：**数据、`mlruns/`、模型工件不提交**；发布验收时也要求\"未提交数据/模型二进制/凭据\"。\n\n**需要提交的**（作为对照）：源码、`config.yaml`、`Dockerfile`、`docker-compose.yml`、`README.md`、`tests/`、`outputs/reports/report.md`，以及少量小体积展示图（`*.png`）。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0039",
+        "c730fa5c_0036",
+        "c730fa5c_0035",
+        "2da65ad3_0040"
+      ],
+      "retrieve_queries": [
+        "信贷项目 git 不提交 忽略文件",
+        ".gitignore 排除 敏感文件 配置"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.9592646000091918,
+        1.3190380000014557
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2048
+      ]
+    },
+    {
+      "id": "cap_023",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0018",
+          "2da65ad3_0036"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0018",
+        "2da65ad3_0008",
+        "2da65ad3_0021",
+        "2da65ad3_0003"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "根据技术规格书，合成数据生成器（`data/synth.py`）生成 **≈2000 条航班记录**，并故意注入因果结构，使特征对标签真实可预测、三大指标可复现。",
+      "tool_sequence_raw": [
+        "retrieve"
+      ],
+      "n_retrieve_calls": 1,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0018",
+        "2da65ad3_0008",
+        "2da65ad3_0021",
+        "2da65ad3_0003"
+      ],
+      "retrieve_queries": [
+        "航班延误项目 合成数据生成器 生成航班记录数量"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.897258699988015,
+        0.8035765999957221
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1024
+      ]
+    },
+    {
+      "id": "cap_024",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0004",
+          "2da65ad3_0028",
+          "2da65ad3_0036"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0004",
+        "2da65ad3_0003",
+        "2da65ad3_0031",
+        "2da65ad3_0008"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "**高风险捕获率目标：≥ 0.80（争取 ~0.84）**\n\n- 定义：高风险类 Recall（同时需报告 Precision/F1）\n- 对照基线：单一规则基线\n\n（来源：航班延误预测与智能调度优化系统技术规格书，核心指标表）",
+      "tool_sequence_raw": [
+        "retrieve"
+      ],
+      "n_retrieve_calls": 1,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0004",
+        "2da65ad3_0003",
+        "2da65ad3_0031",
+        "2da65ad3_0008"
+      ],
+      "retrieve_queries": [
+        "航班延误项目 高风险捕获率 目标值"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.9692945999995572,
+        0.9325367999990704
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1280
+      ]
+    },
+    {
+      "id": "cap_025",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0029"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0029",
+        "2da65ad3_0003",
+        "2da65ad3_0004",
+        "2da65ad3_0031",
+        "c730fa5c_0004",
+        "2da65ad3_0021"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "根据技术规格书（`schedule.py` 调度优化模块，10.1 问题建模）：\n\n**决策变量**：为每个（高风险或全部）航班选一个**起飞时隙偏移** `o_f ∈ {-K, ..., +K}`。\n\n**离散粒度**：离散到 **5 分钟**一档。\n\n**可偏移范围 K**：`K` 如 **30 min**（即偏移范围为 ±30 分钟，对应时窗约束 `|o_f| ≤ K`）。\n\n补充说明：该模型先对每航班 × 每候选偏移预估延误 `D[f][o]`（查表），再求解赋值问题，目标为 `min Σ_f w_f · D[f][o_f]`，硬约束包括时隙容量、周转约束、时窗约束（`|o_f| ≤ K`）和宵禁。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0029",
+        "2da65ad3_0003",
+        "2da65ad3_0004",
+        "2da65ad3_0031"
+      ],
+      "retrieve_queries": [
+        "航班调度优化 决策变量 时隙偏移 离散 分钟 可偏移范围 K",
+        "时隙偏移 离散化 粒度 偏移范围 K 取值"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.8480530999950133,
+        1.4052892000036081
+      ],
+      "llm_call_cache_hit": [
+        256,
+        512
+      ]
+    },
+    {
+      "id": "cap_026",
+      "answer_type": "open",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0029"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0029",
+        "2da65ad3_0031",
+        "2da65ad3_0003",
+        "2da65ad3_0004"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "judge",
+      "stop_reason": "answered",
+      "answer": "航班调度优化的四条硬约束（见技术规格书第 10.1 节）：\n\n1. **时隙容量**：任一时间窗内起飞架次 ≤ 跑道容量 `C`。\n2. **周转约束**：同一 `tail_id` 相邻航段，后段起飞 ≥ 前段到达 + `min_turnaround`（前段到达随其偏移联动）。\n3. **时窗约束**：`|o_f| ≤ K`（起飞时隙偏移不超过 K）。\n4. **宵禁**：禁飞时窗内不得起飞。",
+      "tool_sequence_raw": [
+        "retrieve"
+      ],
+      "n_retrieve_calls": 1,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0029",
+        "2da65ad3_0031",
+        "2da65ad3_0003",
+        "2da65ad3_0004"
+      ],
+      "retrieve_queries": [
+        "航班调度优化 硬约束"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.5674365000013495,
+        1.000348399989889
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1280
+      ]
+    },
+    {
+      "id": "cap_027",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0024"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0019",
+        "2da65ad3_0008",
+        "2da65ad3_0023",
+        "2da65ad3_0018"
+      ],
+      "recall_at_k": 0.0,
+      "recall_at_k_first_call": 0.0,
+      "success": false,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "检索到的内容里没有 `turnaround_slack` 这个字段的定义。\n\n知识库中与周转相关的只有：\n- `min_turnaround`：该机型最小周转时间（分钟），属于数据层 Schema 字段；\n- `prev_leg_delay`：前序航段延误（分钟），首段为 0，是延误传播的主特征。\n\n`turnaround_slack` 在检索到的技术规格书片段中未出现，因此我无法给出它的定义。如果你能提供它所在的章节或文件，我可以再检索确认。",
+      "tool_sequence_raw": [
+        "retrieve"
+      ],
+      "n_retrieve_calls": 1,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0019",
+        "2da65ad3_0008",
+        "2da65ad3_0023",
+        "2da65ad3_0018"
+      ],
+      "retrieve_queries": [
+        "turnaround_slack 定义 航班项目"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.9870756000018446,
+        1.4649162999994587
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1280
+      ]
+    },
+    {
+      "id": "cap_028",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0019"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0019",
+        "2da65ad3_0021",
+        "2da65ad3_0008",
+        "2da65ad3_0003"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "**is_delayed15** 是航班项目的**分类标签**，定义为 `dep_delay > 15`，即起飞延误超过 15 分钟（`dep_delay` 为回归标签，表示起飞延误分钟数）。\n\n补充：数据生成时通过调整系数 `a*`、`sigma`，使 `is_delayed15` 的正类占比落在 **20%–35%** 区间。",
+      "tool_sequence_raw": [
+        "retrieve"
+      ],
+      "n_retrieve_calls": 1,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0019",
+        "2da65ad3_0021",
+        "2da65ad3_0008",
+        "2da65ad3_0003"
+      ],
+      "retrieve_queries": [
+        "航班项目 分类标签 is_delayed15 定义"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.411523999995552,
+        0.9514120000094408
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1149
+      ]
+    },
+    {
+      "id": "cap_029",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0026"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0018",
+        "2da65ad3_0026",
+        "2da65ad3_0003",
+        "2da65ad3_0022",
+        "2da65ad3_0004",
+        "2da65ad3_0031",
+        "2da65ad3_0008"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "根据技术规格书：\n\n- **Optuna 调参 trial 数**：50–100 trial（TPE 采样器）。\n- **回归任务的优化目标**：MAE。\n\n补充上下文：分类任务的优化目标是 PR-AUC 或 F1；搜索空间包括 `num_leaves`、`max_depth`、`learning_rate`、`n_estimators`、`min_child_samples`、`subsample`、`colsample_bytree`、`reg_alpha`、`reg_lambda`。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0018",
+        "2da65ad3_0026",
+        "2da65ad3_0003",
+        "2da65ad3_0022"
+      ],
+      "retrieve_queries": [
+        "航班项目 Optuna 调参 trial 数量",
+        "航班项目 回归任务 优化目标"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.9698391999991145,
+        1.0876599000039278
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2171
+      ]
+    },
+    {
+      "id": "cap_030",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0004",
+          "2da65ad3_0005",
+          "2da65ad3_0008",
+          "2da65ad3_0013",
+          "2da65ad3_0030",
+          "2da65ad3_0031",
+          "2da65ad3_0036",
+          "2da65ad3_0042"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0003",
+        "2da65ad3_0004",
+        "2da65ad3_0029",
+        "2da65ad3_0030",
+        "2da65ad3_0031"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "**主求解器：OR-Tools CP-SAT**（整数变量表示时隙偏移 `o_f`，线性化目标，加硬约束并设求解时限；对硬约束给可行性保证，约束满足率接近 100%）。\n\n**对照基线：贪心迭代局部搜索**——按风险从高到低，为每航班在合法邻域内选使加权总延误下降最多的偏移，多轮扫描至收敛。报告中需给出 CP-SAT vs 贪心在总延误、约束满足率、求解时间上的对比。\n\n补充：调度约束满足率这一指标的对照基线记为「贪心/人工基线」，验收要求 CP-SAT ≥ 0.85 并展示相对贪心的提升。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0003",
+        "2da65ad3_0004",
+        "2da65ad3_0029",
+        "2da65ad3_0030"
+      ],
+      "retrieve_queries": [
+        "航班项目 调度求解器 主求解器 基线",
+        "航班调度 求解器 baseline 对照"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.8266401000000769,
+        1.1628182999993442
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2304
+      ]
+    },
+    {
+      "id": "cap_031",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "2da65ad3_0004",
+          "2da65ad3_0031"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "2da65ad3_0004",
+        "2da65ad3_0031",
+        "2da65ad3_0003",
+        "2da65ad3_0029",
+        "2da65ad3_0008"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "根据技术规格书中的核心指标表：\n\n- **调度约束满足率**：目标 **≥ 0.85**（CP-SAT 可更高），定义为「满足约束数 / 总约束数」，对照基线为贪心/人工基线。\n- **高风险航班延误减少**：目标 **≥ 1.0 min/架次**，定义为「优化前后平均延误差」，对照基线为优化前。\n\n验收标准中同样写明：CP-SAT 约束满足率 ≥ 0.85（并展示相对贪心的提升）；高风险航班平均延误较优化前下降 ≥ 1.0 min/架次。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0004",
+        "2da65ad3_0031",
+        "2da65ad3_0003",
+        "2da65ad3_0029"
+      ],
+      "retrieve_queries": [
+        "航班项目 调度约束满足率 目标值",
+        "高风险航班延误减少 目标值"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.8713209999987157,
+        0.9022895999951288
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2304
+      ]
+    },
+    {
+      "id": "cap_032",
+      "answer_type": "open",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0004",
+          "c730fa5c_0005",
+          "c730fa5c_0008",
+          "c730fa5c_0022",
+          "c730fa5c_0024",
+          "c730fa5c_0029",
+          "c730fa5c_0037"
+        ],
+        [
+          "2da65ad3_0005",
+          "2da65ad3_0008",
+          "2da65ad3_0025"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0024",
+        "2da65ad3_0025",
+        "c730fa5c_0004",
+        "2da65ad3_0027",
+        "2da65ad3_0024"
+      ],
+      "recall_at_k": 1.0,
+      "recall_at_k_first_call": 1.0,
+      "success": false,
+      "success_source": "judge",
+      "stop_reason": "answered",
+      "answer": "两个项目的对照基线如下：\n\n**信贷风控项目**\n- 基线：**逻辑回归** 与 **常数基线**\n- 验收要求：LightGBM 的 AUC/KS/PR-AUC 优于逻辑回归与常数基线（AUC 参考 ~0.86）\n\n**航班延误预测项目**\n- 基线：**RandomForest**（回归+分类）与 **朴素规则**（`weather_severity>阈值 或 prev_leg_delay>阈值 → 高风险`）\n- 验收要求：LightGBM 在测试集优于 RF 与规则基线\n\n两者主模型均为 LightGBM，但基线选择不同：信贷用逻辑回归/常数基线，航班用随机森林/朴素规则。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0024",
+        "2da65ad3_0025",
+        "c730fa5c_0004",
+        "2da65ad3_0027"
+      ],
+      "retrieve_queries": [
+        "信贷项目 LightGBM 主模型 对照基线模型",
+        "航班项目 LightGBM 主模型 对照基线模型"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.0059798000002047,
+        1.2396448000072269
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1664
+      ]
+    },
+    {
+      "id": "cap_033",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "calc"
+      ],
+      "actual_tool": [
+        "calc"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [],
+      "retrieved_doc_ids": [],
+      "recall_at_k": null,
+      "recall_at_k_first_call": null,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "还能再排 2 架次（6 − 4 = 2）。",
+      "tool_sequence_raw": [
+        "calc"
+      ],
+      "n_retrieve_calls": 0,
+      "first_retrieve_doc_ids": [],
+      "retrieve_queries": [],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.8894169999985024,
+        0.983892599993851
+      ],
+      "llm_call_cache_hit": [
+        256,
+        384
+      ]
+    },
+    {
+      "id": "cap_034",
+      "answer_type": "closed",
+      "failure_tag": null,
+      "expected_tool": [
+        "calc"
+      ],
+      "actual_tool": [
+        "calc"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [],
+      "retrieved_doc_ids": [],
+      "recall_at_k": null,
+      "recall_at_k_first_call": null,
+      "success": true,
+      "success_source": "rule",
+      "stop_reason": "answered",
+      "answer": "每架次平均减少 **1.5 分钟**（18.4 − 16.9 = 1.5）。",
+      "tool_sequence_raw": [
+        "calc"
+      ],
+      "n_retrieve_calls": 0,
+      "first_retrieve_doc_ids": [],
+      "retrieve_queries": [],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.5264890999969793,
+        0.954670699997223
+      ],
+      "llm_call_cache_hit": [
+        256,
+        384
+      ]
+    },
+    {
+      "id": "cap_035",
+      "answer_type": "open",
+      "failure_tag": null,
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [
+        [
+          "c730fa5c_0001"
+        ]
+      ],
+      "retrieved_doc_ids": [
+        "c730fa5c_0005",
+        "c730fa5c_0000",
+        "c730fa5c_0010",
+        "c730fa5c_0023",
+        "c730fa5c_0035",
+        "c730fa5c_0006"
+      ],
+      "recall_at_k": 0.0,
+      "recall_at_k_first_call": 0.0,
+      "success": false,
+      "success_source": "judge",
+      "stop_reason": "answered",
+      "answer": "没有。规格书里没有要求用 Kubernetes。\n\n检索到的技术选型表中，容器化环节明确写的是 **Docker**（+ 可选 docker-compose 同起 API 与 MLflow UI），理由是\"一键复现环境\"；服务化用 FastAPI + Pydantic + Uvicorn，CI/CD 用 GitHub Actions，漂移监控用 PSI，演示面板用 Streamlit。整个文档未出现 Kubernetes 或任何容器编排平台的要求。\n\n（补充：该项目的定位是本地可运行、可复现的面试作品，落地路径为 `D:\\xiangmu\\credit-risk-mlops`，因此采用 Docker 而非 K8s 编排。）",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "c730fa5c_0005",
+        "c730fa5c_0000",
+        "c730fa5c_0010",
+        "c730fa5c_0023"
+      ],
+      "retrieve_queries": [
+        "信贷风控项目 规格书 Kubernetes 编排服务",
+        "信贷风控 部署 容器编排 技术要求"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        1.0965866000042297,
+        1.1903550999995787
+      ],
+      "llm_call_cache_hit": [
+        256,
+        2048
+      ]
+    },
+    {
+      "id": "cap_036",
+      "answer_type": "open",
+      "failure_tag": "hallucination_bait",
+      "expected_tool": [
+        "retrieve"
+      ],
+      "actual_tool": [
+        "retrieve"
+      ],
+      "tool_ok": true,
+      "expected_doc_ids": [],
+      "retrieved_doc_ids": [
+        "2da65ad3_0018",
+        "2da65ad3_0003",
+        "2da65ad3_0000",
+        "2da65ad3_0008",
+        "2da65ad3_0004"
+      ],
+      "recall_at_k": null,
+      "recall_at_k_first_call": null,
+      "success": false,
+      "success_source": "judge",
+      "stop_reason": "answered",
+      "answer": "没有。检索到的规格书内容里，数据层主数据源是**合成数据生成器**（`data/synth.py`，约 2000 条航班记录），技术选型中出现的组件是 LightGBM、CP-SAT、RF 等，**并未指定 Apache Kafka 或任何消息队列做实时数据流接入**。\n\n规格书里也没有\"实时数据流接入\"这一环节——数据流是\"合成/真实航班数据 → 清洗结构化 → 特征 → 预测 → 分级 → 调度 → 评估\"的离线批处理链路。所以关于 Kafka 的问题，依据现有知识库无法确认，答案是不指定。",
+      "tool_sequence_raw": [
+        "retrieve",
+        "retrieve"
+      ],
+      "n_retrieve_calls": 2,
+      "first_retrieve_doc_ids": [
+        "2da65ad3_0018",
+        "2da65ad3_0003",
+        "2da65ad3_0000",
+        "2da65ad3_0008"
+      ],
+      "retrieve_queries": [
+        "航班延误项目 规格书 实时数据流接入 Kafka",
+        "航班延误 数据接入 消息队列 技术选型"
+      ],
+      "n_steps": 2,
+      "response_models": [
+        "deepseek-flash",
+        "deepseek-flash"
+      ],
+      "system_fingerprints": [
+        "aeb56401ca74e127821c4f9126dcb669",
+        "aeb56401ca74e127821c4f9126dcb669"
+      ],
+      "llm_call_s": [
+        0.96589770000719,
+        1.6227560999977868
+      ],
+      "llm_call_cache_hit": [
+        256,
+        1920
+      ]
+    }
+  ]
+}

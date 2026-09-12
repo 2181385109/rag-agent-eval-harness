@@ -1,0 +1,22 @@
+{
+  "_doc": "闸 B 已接受的回归登记。每条只覆盖一对具体快照上的一个指标（指标 + 两份快照名 + 跌前跌后数值全部匹配才生效），对其它快照对不生效：latest 下次再跌照样 fail。新增条目必须带 date / reason / accepted_by，并在提交信息里说明。这不是调阈值、不是重写基线，也不是回退 latest.json（CLAUDE.md §13 禁止那三样）。",
+  "entries": [
+    {
+      "metric": "task_success_rate",
+      "current_snapshot": "eval_20260912T081718Z.json",
+      "baseline_snapshot": "eval_20260906T092835Z.json",
+      "baseline_value": 0.9166666666666666,
+      "current_value": 0.75,
+      "delta": -0.16666666666666663,
+      "date": "2026-09-12",
+      "reason": "历史快照（2026-09-06，commit 65bf140）未记录响应模型归属（model / system_fingerprint），0.917→0.750 的差异归因不可行。事实：两个 commit 间 Agent 代码、检索参数、黄金集、判据逐字相同，索引未变；判定变化 6 题（cap_015/016/017/020/027/036）全部 True→False，与 09-11 k=5 稳定性运行及 09-12 单次重跑逐题一致；本次三条链路响应 model 均为 deepseek-flash（指纹 aeb56401ca74e127821c4f9126dcb669）。出处：LIMITATIONS 第 4/16 条、reports/report_20260912T074455Z_full.md、reports/gate_fail_20260912T081718Z.txt。",
+      "accepted_by": "姚尹杰",
+      "evidence": [
+        "reports/gate_fail_20260912T081718Z.txt",
+        "reports/report_20260912T074455Z_full.md",
+        "LIMITATIONS.md#4",
+        "LIMITATIONS.md#16"
+      ]
+    }
+  ]
+}
