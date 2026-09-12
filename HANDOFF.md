@@ -225,7 +225,7 @@ python -m src.eval.report --from-traces reports/traces_latest.jsonl --no-judge-b
 
 ## 六、PERF_SPEC 任务 B 交接（2026-09-12）：延迟分解 + 稳定性 + 闸 C
 
-规格：`D:\PERF_SPEC.md` §3（仓库外）。本节按它 §5.2 的要求写：改了什么、产物在哪、
+规格：仓库外的本机 `PERF_SPEC.md` §3（路径不入库）。本节按它 §5.2 的要求写：改了什么、产物在哪、
 阈值怎么定的、下次从哪接。
 
 ### 改了什么

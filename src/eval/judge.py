@@ -381,6 +381,8 @@ class DeepSeekJudge:
             "timeout_s": self.timeout,
         }
         self._plan: list[dict] | None = None
+        # 最近一次调用的服务端响应元信息（响应 model / 指纹 / 缓存命中），由调用方记录
+        self.last_response_meta: dict[str, object] = {}
 
     def _attempts(self) -> list[dict]:
         return [
@@ -414,9 +416,31 @@ class DeepSeekJudge:
             self._plan = [extra]
             self.params["json_mode"] = "response_format" in extra
             self.params["temperature_sent"] = extra.get("temperature")
+            # 服务端实际响应的模型 / 指纹 / 缓存命中，供调用方逐条记录（2026-09-12 起）。
+            # 请求名与响应名可能不同（旧名被路由到别的后端），记录下来才判断得了
+            # 裁判与被测是否落在同一个后端上。
+            usage = getattr(resp, "usage", None)
+            self.last_response_meta = {
+                "response_model": getattr(resp, "model", None),
+                "system_fingerprint": getattr(resp, "system_fingerprint", None),
+                "prompt_tokens": getattr(usage, "prompt_tokens", None),
+                "completion_tokens": getattr(usage, "completion_tokens", None),
+                "prompt_cache_hit_tokens": _usage_field(usage, "prompt_cache_hit_tokens"),
+                "prompt_cache_miss_tokens": _usage_field(usage, "prompt_cache_miss_tokens"),
+            }
             content = resp.choices[0].message.content
             return content or ""
         raise RuntimeError(f"裁判调用全部参数组合都被拒绝（{sample_id}）：{last_error}")
+
+
+def _usage_field(usage, name: str):
+    """DeepSeek 在 usage 里多带的字段（缓存命中等），openai SDK 放在 model_extra 里。"""
+    if usage is None:
+        return None
+    value = getattr(usage, name, None)
+    if value is None:
+        value = (getattr(usage, "model_extra", None) or {}).get(name)
+    return value
 
 
 def answer_fingerprint(answer: str) -> str:

@@ -28,23 +28,34 @@ class PhaseTimer:
     llm_call_s: list[float] = field(default_factory=list)
     cache_hit_tokens: int | None = None
     cache_miss_tokens: int | None = None
+    # 首条响应（兼容旧记录）+ 逐条列表（2026-09-12 起）：同一运行内多次调用是否落在
+    # 同一后端，只有逐条记录才判断得了。
     response_model: str | None = None
     system_fingerprint: str | None = None
+    response_models: list[str | None] = field(default_factory=list)
+    system_fingerprints: list[str | None] = field(default_factory=list)
+    llm_call_cache_hit: list[int | None] = field(default_factory=list)
+    llm_call_cache_miss: list[int | None] = field(default_factory=list)
 
     def add_usage(self, resp) -> None:
+        model = getattr(resp, "model", None)
+        fingerprint = getattr(resp, "system_fingerprint", None)
+        self.response_models.append(model)
+        self.system_fingerprints.append(fingerprint)
+        if self.response_model is None:
+            self.response_model = model
+        if self.system_fingerprint is None:
+            self.system_fingerprint = fingerprint
+
         usage = getattr(resp, "usage", None)
-        if usage is None:
-            return
-        hit = _usage_field(usage, "prompt_cache_hit_tokens")
-        miss = _usage_field(usage, "prompt_cache_miss_tokens")
+        hit = _usage_field(usage, "prompt_cache_hit_tokens") if usage is not None else None
+        miss = _usage_field(usage, "prompt_cache_miss_tokens") if usage is not None else None
+        self.llm_call_cache_hit.append(None if hit is None else int(hit))
+        self.llm_call_cache_miss.append(None if miss is None else int(miss))
         if hit is not None:
             self.cache_hit_tokens = (self.cache_hit_tokens or 0) + int(hit)
         if miss is not None:
             self.cache_miss_tokens = (self.cache_miss_tokens or 0) + int(miss)
-        if self.response_model is None:
-            self.response_model = getattr(resp, "model", None)
-        if self.system_fingerprint is None:
-            self.system_fingerprint = getattr(resp, "system_fingerprint", None)
 
 
 def _usage_field(usage, name: str):

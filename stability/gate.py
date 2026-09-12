@@ -53,7 +53,7 @@ def check_thresholds(summary: dict) -> list[dict]:
 
 
 # ------------------------------------------------------------------ 可复现闸
-NOT_RECOMPUTED = ("answer_similarity", "main_snapshot_comparison")
+NOT_RECOMPUTED = ("answer_similarity", "main_snapshot_comparison", "retrieval_persistence")
 
 
 def _strip_similarity(section: dict) -> dict:
@@ -108,12 +108,22 @@ def check_reproducible(
         else:
             out.append(_finding("judge_file", "fail", str(jp), None, "summary 引用的逐次裁判分文件不存在"))
 
+    probe = None
+    probe_path = None
+    if meta.get("probe_file"):
+        probe_path = config.PROJECT_ROOT / meta["probe_file"]
+        if probe_path.exists():
+            probe = analyze.load_probe(probe_path)
+        else:
+            out.append(_finding("probe_file", "fail", str(probe_path), None, "summary 引用的模型探针文件不存在"))
+
     recomputed = analyze.build_summary(
         rows, samples, run_meta=meta.get("run_meta"), judge_rows=judge_rows, embedder=None,
         raw_path=raw, judge_path=(judge_path or (config.PROJECT_ROOT / meta["judge_file"] if meta.get("judge_file") else None)),
+        probe=probe, probe_path=probe_path,
     )
 
-    for section in ("latency", "cost"):
+    for section in ("latency", "cost", "model_attribution"):
         same = _canon(recomputed.get(section)) == _canon(summary.get(section))
         out.append(_finding(section, "ok" if same else "fail", None, None, f"{section} 段重算必须逐位相等"))
 

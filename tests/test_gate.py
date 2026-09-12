@@ -294,28 +294,161 @@ def test_find_previous_snapshot_returns_none_when_alone(tmp_path):
     )
 
 
-def test_committed_reports_have_not_regressed():
-    """真正的回归断言：仓库里最新的报告相对上一份快照没有跌破容差。
+def test_committed_reports_have_no_unaccepted_regression():
+    """真正的回归断言：仓库里最新的报告相对上一份快照**没有新增**跌破容差的指标。
 
     这条测试读的是已提交进 git 的 JSON，不跑评测、不调 API。
-    有人提交了一份变差的报告，CI 就会在这里红。
+    有人提交了一份变差的报告，CI 就会在这里红——除非那次下跌已被登记进
+    reports/gate_accepted_regressions.json（带日期、原因、接受人，且只对那一对快照生效）。
     """
     latest = config.REPORTS_DIR / "latest.json"
     if not latest.exists():
         pytest.skip("还没有 latest.json")
     current = json.loads(latest.read_text(encoding="utf-8"))
-    previous = report_mod.find_previous_snapshot(
-        current=config.REPORTS_DIR / report_mod.snapshot_filename(current["meta"]["timestamp_utc"])
-    )
+    current_name = report_mod.snapshot_filename(current["meta"]["timestamp_utc"])
+    previous = report_mod.find_previous_snapshot(current=config.REPORTS_DIR / current_name)
     if previous is None:
         pytest.skip("除本次外没有可比的历史快照")
 
     findings = report_mod.check_regression_gate(
         current, json.loads(previous.read_text(encoding="utf-8"))
     )
+    findings = report_mod.apply_accepted_regressions(
+        findings, report_mod.load_accepted_regressions(),
+        current_snapshot=current_name, baseline_snapshot=previous.name,
+    )
     dropped = [f for f in findings if f["status"] == "dropped"]
-    assert not dropped, f"关键指标相对 {previous.name} 跌破容差：{dropped}"
+    assert not dropped, f"关键指标相对 {previous.name} 出现未登记的下跌：{dropped}"
+
+
+# ------------------------------------------------------------------ 闸 B · 已接受的回归
+def _accepted(metric="task_success_rate", cur="eval_20260912T081718Z.json", base="eval_20260906T092835Z.json",
+              base_value=0.9, cur_value=0.75, **over):
+    entry = {
+        "metric": metric, "current_snapshot": cur, "baseline_snapshot": base,
+        "baseline_value": base_value, "current_value": cur_value, "delta": cur_value - base_value,
+        "date": "2026-09-12", "reason": "历史快照未记录模型归属，归因不可行", "accepted_by": "负责人",
+    }
+    entry.update(over)
+    return entry
+
+
+def _dropped_findings(base_value=0.9, cur_value=0.75):
+    return report_mod.check_regression_gate(_report(success=cur_value), _report(success=base_value))
+
+
+def test_accepted_regression_turns_dropped_into_accepted_and_keeps_provenance():
+    findings = report_mod.apply_accepted_regressions(
+        _dropped_findings(), [_accepted()],
+        current_snapshot="eval_20260912T081718Z.json", baseline_snapshot="eval_20260906T092835Z.json",
+    )
+    by = {f["metric"]: f for f in findings}
+    assert by["task_success_rate"]["status"] == "accepted"
+    assert by["task_success_rate"]["accepted"]["date"] == "2026-09-12"
+    assert by["task_success_rate"]["accepted"]["accepted_by"] == "负责人"
+    assert "归因不可行" in by["task_success_rate"]["accepted"]["reason"]
+    assert by["task_success_rate"]["delta"] < 0  # 数值照旧，只是状态变了
+    assert by["tool_accuracy"]["status"] == "ok"
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"baseline_snapshot": "eval_20260905T142507Z.json"},  # 另一对快照
+        {"current_snapshot": "eval_20260913T000000Z.json"},
+        {"metric": "tool_accuracy"},                           # 另一个指标
+        {"baseline_value": 0.95},                              # 数值对不上：登记的不是这次下跌
+        {"current_value": 0.70},
+    ],
+)
+def test_accepted_regression_covers_only_the_registered_pair_and_values(override):
+    """登记只对那一对快照、那一个指标、那两个数值生效——换一对快照又跌了，照样 dropped。"""
+    findings = report_mod.apply_accepted_regressions(
+        _dropped_findings(), [_accepted(**override)],
+        current_snapshot="eval_20260912T081718Z.json", baseline_snapshot="eval_20260906T092835Z.json",
+    )
+    assert {f["metric"]: f["status"] for f in findings}["task_success_rate"] == "dropped"
+
+
+def test_accepted_regression_does_not_touch_ok_or_incomparable():
+    flat = report_mod.check_regression_gate(_report(), _report())
+    out = report_mod.apply_accepted_regressions(
+        flat, [_accepted(base_value=0.9, cur_value=0.9)],
+        current_snapshot="eval_20260912T081718Z.json", baseline_snapshot="eval_20260906T092835Z.json",
+    )
+    assert {f["status"] for f in out} == {"ok"}
+
+
+@pytest.mark.parametrize("missing", ["date", "reason", "accepted_by", "baseline_snapshot", "current_value"])
+def test_accepted_regression_entry_must_be_complete(tmp_path, missing):
+    """缺日期 / 原因 / 接受人的登记不算数：读取直接报错，而不是静默放行。"""
+    entry = _accepted()
+    entry.pop(missing)
+    path = tmp_path / "gate_accepted_regressions.json"
+    path.write_text(json.dumps({"entries": [entry]}, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError):
+        report_mod.load_accepted_regressions(path)
+
+
+def test_accepted_regression_rejects_bad_date_and_blank_reason(tmp_path):
+    for bad in ({"date": "12/09/2026"}, {"reason": "   "}, {"accepted_by": ""}):
+        path = tmp_path / "gate_accepted_regressions.json"
+        path.write_text(json.dumps({"entries": [_accepted(**bad)]}, ensure_ascii=False), encoding="utf-8")
+        with pytest.raises(ValueError):
+            report_mod.load_accepted_regressions(path)
+
+
+def test_accepted_regressions_missing_file_means_nothing_accepted(tmp_path):
+    assert report_mod.load_accepted_regressions(tmp_path / "nope.json") == []
+
+
+def test_committed_accepted_regressions_point_at_existing_snapshots():
+    """仓库里登记的每条接受项：指标在闸 B 范围内、两份快照都在 reports/ 里、数值与快照里的一致。"""
+    entries = report_mod.load_accepted_regressions()
+    for e in entries:
+        assert e["metric"] in config.GATED_METRICS
+        cur = config.REPORTS_DIR / e["current_snapshot"]
+        base = config.REPORTS_DIR / e["baseline_snapshot"]
+        assert cur.exists() and base.exists(), e
+        cur_v = report_mod._metric_value(json.loads(cur.read_text(encoding="utf-8")), e["metric"])
+        base_v = report_mod._metric_value(json.loads(base.read_text(encoding="utf-8")), e["metric"])
+        assert abs(cur_v - e["current_value"]) < 1e-9 and abs(base_v - e["baseline_value"]) < 1e-9, e
+
+
+def test_run_gates_prints_accepted_regression_with_its_reason(capsys):
+    """接受过的下跌不能在门禁输出里消失：要打印 accepted、日期与原因，让读输出的人看得见。"""
+    code = report_mod.run_gates()
+    out = capsys.readouterr().out
+    if "accepted" not in out:
+        pytest.skip("当前 latest.json 没有已接受的回归")
+    assert code == 0
+    assert "2026-09-12" in out and "归因不可行" in out
 
 
 def test_run_gates_returns_zero_when_clean():
     assert report_mod.run_gates() == 0
+
+
+def test_gate_b_refuses_a_baseline_whose_content_equals_latest(tmp_path, monkeypatch, capsys):
+    """基线与 latest 内容相同（比如快照复制件没按 meta.timestamp_utc 命名，闸 B 把它自己选成了基线）
+    必须报错而不是打印一排 ok——静默的「无差异」正是 2026-09-12 差点发生的事。"""
+    payload = {"meta": {"timestamp_utc": "2026-09-12T08:17:18+00:00", "golden_set_size": 1},
+               "metrics": {"task_success_rate": {"value": 0.5, "n": 1, "total": 1}}}
+    text = json.dumps(payload, ensure_ascii=False)
+    (tmp_path / "latest.json").write_text(text, encoding="utf-8")
+    (tmp_path / "eval_20260912T074455Z.json").write_text(text, encoding="utf-8")  # 错名复制件
+    monkeypatch.setattr(config, "REPORTS_DIR", tmp_path)
+    monkeypatch.setattr(report_mod, "check_exact_gate", lambda: [])
+    from stability import gate as stability_gate
+    monkeypatch.setattr(stability_gate, "run_gate_c", lambda: (True, []))
+    assert report_mod.run_gates() != 0
+    assert "内容相同" in capsys.readouterr().out
+
+
+def test_find_previous_snapshot_ignores_non_pipeline_snapshot_names(tmp_path):
+    """另存的对照快照（如 eval_20260912_rerun.json）不能被当成闸 B 的基线。"""
+    (tmp_path / "eval_20260906T092835Z.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "eval_20260912_rerun.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "eval_20260913T000000Z.json").write_text("{}", encoding="utf-8")
+    prev = report_mod.find_previous_snapshot(tmp_path, current=tmp_path / "eval_20260913T000000Z.json")
+    assert prev.name == "eval_20260906T092835Z.json"

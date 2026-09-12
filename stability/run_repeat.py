@@ -177,6 +177,8 @@ def run_once(agent, sample: GoldenSample, run_index: int, k: int, run_id: str) -
         n_retrieve_calls=timer.n_retrieve_calls,
         n_tool_calls=timer.n_tool_calls,
         llm_call_s=timer.llm_call_s,
+        llm_call_cache_hit=timer.llm_call_cache_hit,
+        llm_call_cache_miss=timer.llm_call_cache_miss,
     )
     tokens = Tokens(
         prompt=trace.prompt_tokens if trace else 0,
@@ -203,6 +205,8 @@ def run_once(agent, sample: GoldenSample, run_index: int, k: int, run_id: str) -
         error=error,
         response_model=timer.response_model,
         system_fingerprint=timer.system_fingerprint,
+        response_models=timer.response_models,
+        system_fingerprints=timer.system_fingerprints,
     )
 
 

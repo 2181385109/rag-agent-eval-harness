@@ -56,6 +56,8 @@ def score_rows(rows, samples, *, call=None, progress=True) -> list[dict]:
                 "rubric_version": judge.RUBRIC_VERSION,
                 "judge_params": dict(getattr(caller, "params", {})),
                 "scored_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                # 服务端实际响应（2026-09-12 起记录；09-11 那份没有这几个字段）
+                **{k: v for k, v in dict(getattr(caller, "last_response_meta", {}) or {}).items()},
             }
         )
         if progress:

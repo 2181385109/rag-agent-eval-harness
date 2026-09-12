@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -43,6 +44,19 @@ def _git_commit() -> str:
         return out.stdout.strip() or "unknown"
     except Exception:
         return "unknown"
+
+
+def repo_relative(path: Path | str) -> str:
+    """快照里的溯源路径一律记成仓库相对路径（posix），仓库外的原样保留。
+
+    快照进 git、会公开。绝对路径带着本机盘符与目录名（2026-09-06 脱敏时手改过一次，
+    但写它的代码没改，09-12 的重跑又带了回来）。仓库外的路径不猜相对位置，原样记。
+    """
+    p = Path(path)
+    try:
+        return p.resolve().relative_to(Path(config.PROJECT_ROOT).resolve()).as_posix()
+    except ValueError:
+        return str(path)
 
 
 def run_samples(
@@ -208,6 +222,9 @@ def build_report(
     }
 
 
+SNAPSHOT_NAME_RE = re.compile(r"eval_\d{8}T\d{6}Z\.json")
+
+
 def snapshot_filename(timestamp_utc: str) -> str:
     """报告快照的文件名。去掉 : - 和时区偏移里的 +，对 URL / shell 友好。
 
@@ -302,7 +319,7 @@ def load_ragas_reuse(path: Path | str) -> dict | None:
         canonical = source.parent / snapshot_filename(stamp)
         if canonical.exists():
             source = canonical
-    block["reused_from"] = str(source)
+    block["reused_from"] = repo_relative(source)
     block["reused_from_timestamp"] = stamp
     return block
 
@@ -376,7 +393,7 @@ def load_judge_backfill(
     # 分数不再与旧分可比（闸 B 据此判 incomparable）。老文件没这个字段，记 None。
     rubrics = sorted({row.get("rubric_version") for row in rows if row.get("rubric_version")})
     provenance = {
-        "source": str(target),
+        "source": repo_relative(target),
         "judge_model": models[0] if len(models) == 1 else models,
         "rubric_version": (rubrics[0] if len(rubrics) == 1 else rubrics) or None,
         "open_threshold": config.OPEN_SUCCESS_THRESHOLD,
@@ -536,6 +553,19 @@ def _fmt(value: float | None) -> str:
     return "—" if value is None else f"{value:.3f}"
 
 
+def served_label(meta: Mapping, chain: str, requested: str | None) -> str:
+    """「请求 `名`，响应 `名`×次数」。响应名取自 meta.served[chain]（2026-09-12 起记录）；
+    没有就写「未记录」，**不**回填请求名——请求名与响应名可能不同（旧名被路由到别的后端），
+    只打印请求名会让读报告的人以为被测就是它。"""
+    served = ((meta.get("served") or {}).get(chain)) or {}
+    counts = served.get("response_model_counts") or {}
+    if not counts or served.get("status") == "未记录":
+        resp = "未记录"
+    else:
+        resp = "、".join(f"`{k}`×{v}" for k, v in counts.items())
+    return f"请求 `{requested}`，响应 {resp}"
+
+
 def _render_success_rule(report: dict) -> list[str]:
     """任务成功率的口径自述。
 
@@ -564,7 +594,7 @@ def _render_success_rule(report: dict) -> list[str]:
         "### 任务成功率的判定口径",
         "",
         f"- 闭合题 **{meta.get('n_rule_judged')}** 题：`answer_keys` 全部命中才算成功。",
-        f"- 开放题 **{meta.get('n_judge_judged')}** 题：裁判（`{backfill.get('judge_model')}`）"
+        f"- 开放题 **{meta.get('n_judge_judged')}** 题：裁判（{served_label(report.get('meta') or {}, 'judge', backfill.get('judge_model'))}）"
         f"打分 **≥ {meta.get('open_threshold')}** 才算成功——"
         f"三级标度里 1 分是「方向对但要点有遗漏」，**不计成功**。",
         f"- 裁判分来源：`{Path(backfill.get('source', '')).name}`。",
@@ -608,7 +638,7 @@ def render_markdown(report: dict) -> str:
         "",
         f"- 时间（UTC）：{meta['timestamp_utc']}",
         f"- git commit：`{meta['git_commit']}`",
-        f"- 被测模型：`{meta['model']}`（temperature={meta['temperature']}）",
+        f"- 被测模型：{served_label(meta, 'agent', meta['model'])}（temperature={meta['temperature']}）",
         f"- Embedding：`{meta['embedding_model']}`（查询指令前缀={meta['use_query_instruction']}）",
         f"- 检索 top-k：{meta['retrieve_top_k']}；切分 {meta['chunk_size']}/{meta['chunk_overlap']}",
         f"- 黄金集：{meta['golden_set_size']} 条",
@@ -674,7 +704,7 @@ def render_markdown(report: dict) -> str:
             "",
             "## RAGAS（生成质量）",
             "",
-            f"- 裁判模型：`{rg.get('judge_model')}`；embedding：`{rg.get('embedding_model')}`（本地，不外发）",
+            f"- 裁判模型：{served_label(meta, 'ragas', rg.get('judge_model'))}；embedding：`{rg.get('embedding_model')}`（本地，不外发）",
         ]
         if rg.get("reused_from"):
             verification = rg.get("reuse_verification")
@@ -778,6 +808,15 @@ def render_markdown(report: dict) -> str:
         from src.eval.judge import render_agreement_markdown
 
         lines += ["", render_agreement_markdown(agreement).rstrip()]
+    else:
+        # 人工标注只对它标注时的那批答案有效；换了答案这一节就没了。没了要说出来，不能悄悄消失。
+        lines += [
+            "",
+            "## 自动↔人工一致率（kappa）",
+            "",
+            "本快照不含此节：agreement 为空（未计算，或人工标注不对应本批答案——"
+            "人工标注只对标注时的那批答案有效，答案变了 kappa 不可直接重算）。",
+        ]
 
     lines += _render_judge_revision(report)
 
@@ -1199,8 +1238,105 @@ def find_previous_snapshot(directory: Path | None = None, current: Path | None =
     """
     target = Path(directory) if directory else config.REPORTS_DIR
     cur = Path(current).name if current else None
-    snapshots = sorted(p for p in target.glob("eval_*.json") if p.name != cur)
+    # 只认 snapshot_filename 产出的定长时间戳命名（eval_YYYYMMDDTHHMMSSZ.json）。
+    # 像 eval_20260912_rerun.json 这类另存的对照快照不是流水线快照，
+    # 不能被当成闸 B 的基线——它们的存在本身就是为了和 latest 并列比较，不是取代。
+    snapshots = sorted(
+        p for p in target.glob("eval_*.json")
+        if p.name != cur and SNAPSHOT_NAME_RE.fullmatch(p.name)
+    )
     return snapshots[-1] if snapshots else None
+
+
+# ---------------------------------------------------------------- 闸 B · 已接受的回归
+# 闸 B 拦下一次真实下跌之后，项目要么修好被测系统，要么**有据地**接受这次下跌。
+# 接受不是把阈值调低、不是重写基线、也不是把 latest.json 回退——那三条都是 §13 禁止的。
+# 接受 = 在 reports/gate_accepted_regressions.json 登记一条：哪一对快照、哪个指标、
+# 跌前跌后的数值、日期、原因、接受人。登记只对那一对快照生效：下次 latest 再跌，照样 fail。
+# 登记文件进 git，改动出现在 diff 和提交历史里，这就是它的审计线。
+GATE_ACCEPTED_REGRESSIONS_FILENAME = "gate_accepted_regressions.json"
+ACCEPTED_REGRESSION_FIELDS = (
+    "metric", "current_snapshot", "baseline_snapshot", "baseline_value", "current_value",
+    "date", "reason", "accepted_by",
+)
+_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def load_accepted_regressions(path: Path | str | None = None) -> list[dict]:
+    """读回已接受的回归登记；文件不存在 = 什么都没接受。
+
+    每条登记必须齐全：缺日期 / 原因 / 接受人的不算数，直接报错——
+    一条没写清楚为什么的接受，和把阈值悄悄调低没有区别。
+    """
+    target = Path(path) if path else (config.REPORTS_DIR / GATE_ACCEPTED_REGRESSIONS_FILENAME)
+    if not target.exists():
+        return []
+    data = json.loads(target.read_text(encoding="utf-8"))
+    entries = data.get("entries") if isinstance(data, Mapping) else None
+    if not isinstance(entries, list):
+        raise ValueError(f"{target}：顶层需要 entries 列表")
+    for i, e in enumerate(entries):
+        missing = [k for k in ACCEPTED_REGRESSION_FIELDS if k not in e]
+        if missing:
+            raise ValueError(f"{target} 第 {i} 条缺字段 {missing}")
+        if not _DATE_RE.fullmatch(str(e["date"])):
+            raise ValueError(f"{target} 第 {i} 条 date 须为 YYYY-MM-DD：{e['date']!r}")
+        for k in ("reason", "accepted_by"):
+            if not str(e[k]).strip():
+                raise ValueError(f"{target} 第 {i} 条 {k} 为空")
+        for k in ("baseline_value", "current_value"):
+            if not isinstance(e[k], (int, float)):
+                raise ValueError(f"{target} 第 {i} 条 {k} 须为数值")
+    return list(entries)
+
+
+def apply_accepted_regressions(
+    findings: Sequence[Mapping],
+    accepted: Sequence[Mapping],
+    *,
+    current_snapshot: str,
+    baseline_snapshot: str,
+) -> list[dict]:
+    """把 dropped 里"已登记接受"的那条改成 accepted，其余原样返回。
+
+    匹配键：指标 + 本次快照名 + 基线快照名 + 跌前跌后的数值，缺一不算。
+    数值也要对上，是为了让一条登记只能覆盖它描述的那一次下跌——
+    同一对快照、同一指标若数值不同，说明快照被改过或登记写错，都不该放行。
+    """
+    out: list[dict] = []
+    for f in findings:
+        if f.get("status") != "dropped":
+            out.append(dict(f))
+            continue
+        match = next(
+            (
+                e for e in accepted
+                if e["metric"] == f["metric"]
+                and e["current_snapshot"] == current_snapshot
+                and e["baseline_snapshot"] == baseline_snapshot
+                and _close(e["baseline_value"], f.get("baseline"))
+                and _close(e["current_value"], f.get("current"))
+            ),
+            None,
+        )
+        if match is None:
+            out.append(dict(f))
+            continue
+        out.append(
+            {
+                **f,
+                "status": "accepted",
+                "accepted": {k: match[k] for k in ("date", "reason", "accepted_by")},
+            }
+        )
+    return out
+
+
+def _close(a, b, tol: float = 1e-9) -> bool:
+    try:
+        return abs(float(a) - float(b)) <= tol
+    except (TypeError, ValueError):
+        return False
 
 
 def run_gates() -> int:
@@ -1228,12 +1364,28 @@ def run_gates() -> int:
         else:
             baseline_report = json.loads(previous.read_text(encoding="utf-8"))
             print(f"闸 B（回归闸）：latest.json vs {previous.name}，容差 {config.METRIC_DROP_TOLERANCE}")
-            for f in check_regression_gate(current_report, baseline_report):
+            if previous.read_bytes() == latest.read_bytes():
+                # 基线就是 latest 自己（多半是快照复制件没按 meta.timestamp_utc 命名）：
+                # 自己比自己必然一排 ok，那不是 PASS，是没有基线。报错，不放行。
+                failed = True
+                print(f"  ERROR     基线 {previous.name} 与 latest.json 内容相同（自己比自己），不能作基线；"
+                      f"快照文件名须为 snapshot_filename(meta.timestamp_utc) = {prev_name}")
+            findings = apply_accepted_regressions(
+                check_regression_gate(current_report, baseline_report),
+                load_accepted_regressions(),
+                current_snapshot=prev_name,
+                baseline_snapshot=previous.name,
+            )
+            for f in findings:
                 if f["status"] == "dropped":
                     failed = True
                 delta = f.get("delta")
                 shown = f"{delta:+.4f}" if isinstance(delta, float) else "—"
                 print(f"  {f['status']:12} {f['metric']}: {f.get('baseline')} -> {f.get('current')}  ({shown})")
+                if f["status"] == "accepted":
+                    acc = f["accepted"]
+                    print(f"               已接受的回归（{GATE_ACCEPTED_REGRESSIONS_FILENAME}）：{acc['date']}，接受人 {acc['accepted_by']}")
+                    print(f"               原因：{acc['reason']}")
 
     # 闸 C（稳定性闸，PERF_SPEC B4）：同一输入重复 k 次的成功率标准差与轨迹自洽率，
     # 外加"summary.json 的数字必须能由原始产物重算出来"。逻辑在 stability/gate.py。

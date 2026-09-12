@@ -145,10 +145,112 @@ def latency_section(rows: Sequence[RunRecord]) -> dict:
         "share_median": {p: (float(statistics.median(shares[p])) if shares[p] else None) for p in PHASES},
         "llm_calls_per_run": _pct([float(r.latency.n_llm_calls) for r in ok]),
         "single_llm_call": _pct([s for r in ok for s in r.latency.llm_call_s]),
+        "by_cache": latency_by_cache(ok),
+        "pass0_observation": pass0_observation(ok),
         "n_total": len(rows),
         "n_ok": len(ok),
         "n_error": n_error,
         "error_rate": (n_error / len(rows)) if rows else None,
+    }
+
+
+def latency_by_cache(ok: Sequence[RunRecord]) -> dict:
+    """按运行级 prompt_cache_hit_tokens == 0 / > 0 分两组报端到端分位数。
+
+    注意分组依据是**整次运行内所有 LLM 调用的缓存命中之和**（09-11 的记录只有这一级）。
+    一次运行通常含 ≥2 次调用，第二次起会命中第一次写入的系统提示词前缀，
+    所以"== 0"组只可能包含单次调用的运行。逐次调用的缓存命中自 09-12 起才记录。
+    未命中组为空时 headline_group 退到 hit，并如实标出 n=0，不能拿 0 冒充。
+    """
+    miss = [r for r in ok if r.tokens.cache_hit == 0]
+    hit = [r for r in ok if r.tokens.cache_hit is not None and r.tokens.cache_hit > 0]
+    unknown = [r for r in ok if r.tokens.cache_hit is None]
+    miss_stats = _pct([r.latency.total_s for r in miss])
+    hit_stats = _pct([r.latency.total_s for r in hit])
+    return {
+        "rule": "按 tokens.cache_hit（整次运行内各 LLM 调用的 prompt_cache_hit_tokens 之和）== 0 / > 0 分组；端到端 wall-clock 秒",
+        "miss": miss_stats,
+        "hit": hit_stats,
+        "unknown_n": len(unknown),
+        "headline_group": "miss" if miss_stats["n"] > 0 else "hit",
+        "caveat": (
+            "分组依据是运行级的和：同一运行内第二次调用起会命中第一次写入的前缀，"
+            "所以含 ≥2 次 LLM 调用的运行几乎必然 > 0；逐次调用的缓存命中 2026-09-12 起才逐条记录"
+        ),
+    }
+
+
+SINGLE_CALL_CLOSE_TOLERANCE = 0.10  # 各 pass 单次 LLM 调用 P50 相对 pass 0 的偏差 ≤ 10% 视为"接近"
+
+
+def pass0_observation(ok: Sequence[RunRecord]) -> dict | None:
+    """pass 0（无跨轮缓存）与后续 pass 的端到端 P50 对照，并补两项检查：
+
+    1. 单次 LLM 调用延迟（llm_call_s 逐条）按 pass 的 P50 是否接近（阈值见常量）；
+    2. 把轨迹长度固定在众数（n_llm_calls 的众数）后，pass 0 的端到端 P50 是否仍低于全部后续 pass。
+
+    两项同时成立（单次接近 + 控制长度后差距消失）才把标签改成
+    「延迟差异主要由轨迹长度解释，非缓存效应」；否则保留「未解释现象」。只陈述，不解释。
+    """
+    from collections import Counter
+
+    by_pass: dict[int, list[RunRecord]] = {}
+    for r in ok:
+        by_pass.setdefault(r.run_index, []).append(r)
+    if 0 not in by_pass or len(by_pass) < 2:
+        return None
+
+    modal_calls = Counter(r.latency.n_llm_calls for r in ok).most_common(1)[0][0]
+    per_pass: dict[str, dict] = {}
+    for i in sorted(by_pass):
+        rs = by_pass[i]
+        calls = [x for r in rs for x in r.latency.llm_call_s]
+        at_modal = [r.latency.total_s for r in rs if r.latency.n_llm_calls == modal_calls]
+        per_pass[str(i)] = {
+            "n": len(rs),
+            "e2e_p50": float(np.percentile([r.latency.total_s for r in rs], 50)),
+            "e2e_p50_at_modal_calls": (float(np.percentile(at_modal, 50)) if at_modal else None),
+            "n_at_modal_calls": len(at_modal),
+            "single_call_p50": (float(np.percentile(calls, 50)) if calls else None),
+            "single_call_p95": (float(np.percentile(calls, 95)) if calls else None),
+            "n_calls": len(calls),
+            "mean_n_llm_calls": float(np.mean([r.latency.n_llm_calls for r in rs])),
+            "mean_tokens": float(np.mean([r.tokens.total for r in rs])),
+            "mean_cache_hit": _mean([r.tokens.cache_hit for r in rs if r.tokens.cache_hit is not None]),
+        }
+
+    p0 = per_pass["0"]
+    later = {k_: v for k_, v in per_pass.items() if k_ != "0"}
+    faster = p0["e2e_p50"] < min(v["e2e_p50"] for v in later.values())
+    base = p0["single_call_p50"]
+    single_close = (
+        base is not None and base > 0
+        and all(v["single_call_p50"] is not None and abs(v["single_call_p50"] - base) / base <= SINGLE_CALL_CLOSE_TOLERANCE for v in later.values())
+    )
+    controlled = [v["e2e_p50_at_modal_calls"] for v in later.values() if v["e2e_p50_at_modal_calls"] is not None]
+    gap_persists = (
+        p0["e2e_p50_at_modal_calls"] is not None and bool(controlled)
+        and p0["e2e_p50_at_modal_calls"] < min(controlled)
+    )
+    if not faster:
+        label = "符合预期方向（pass 0 不快于后续 pass）"
+    elif single_close and not gap_persists:
+        label = "延迟差异主要由轨迹长度解释，非缓存效应"
+    else:
+        label = "未解释现象"
+    return {
+        "pass0_p50": p0["e2e_p50"],
+        "pass0_n": p0["n"],
+        "later_p50_by_pass": {k_: v["e2e_p50"] for k_, v in later.items()},
+        "later_p50_min": min(v["e2e_p50"] for v in later.values()),
+        "later_p50_max": max(v["e2e_p50"] for v in later.values()),
+        "pass0_faster_than_all_later": faster,
+        "modal_n_llm_calls": modal_calls,
+        "per_pass": per_pass,
+        "single_call_close": single_close,
+        "single_call_close_rule": f"各 pass 单次 LLM 调用 P50 相对 pass 0 偏差 ≤ {SINGLE_CALL_CLOSE_TOLERANCE:.0%}",
+        "length_controlled_gap_persists": gap_persists,
+        "label": label,
     }
 
 
@@ -216,6 +318,12 @@ def stability_section(
     unjudged: list[str] = []
     source_counts = {"rule": 0, "judge": 0}
     verdict_detail: dict[str, dict] = {}
+    # 分路统计：规则判定（闭合题）与裁判判定（开放题）各自的自洽率与分母，
+    # 外加裁判路每题 k 次裁判分的标准差（总体标准差 ddof=0）。
+    by_source: dict[str, dict] = {
+        "rule": {"hits": [], "inconsistent_ids": []},
+        "judge": {"hits": [], "inconsistent_ids": [], "score_std_per_question": {}, "scores_per_question": {}},
+    }
     for sid in sorted(groups):
         rs = groups[sid]
         sample = sample_map.get(sid)
@@ -229,8 +337,50 @@ def stability_section(
         verdict_hits.append(1.0 if consistent else 0.0)
         if not consistent:
             verdict_bad.append(sid)
-        source_counts["rule" if sample.answer_type == "closed" else "judge"] += 1
+        source = "rule" if sample.answer_type == "closed" else "judge"
+        source_counts[source] += 1
+        by_source[source]["hits"].append(1.0 if consistent else 0.0)
+        if not consistent:
+            by_source[source]["inconsistent_ids"].append(sid)
+        if source == "judge":
+            scores = [judge_lookup[(sid, r.run_index)] for r in rs]
+            by_source["judge"]["scores_per_question"][sid] = scores
+            by_source["judge"]["score_std_per_question"][sid] = float(np.std(scores, ddof=0))
         verdict_detail[sid] = {"consistent": consistent, "verdicts": verdicts}
+
+    # 判定翻转的位置：偏离多数派的 pass 编号。只陈述位置；k=5 下判不了是否与运行顺序相关。
+    flip_positions: dict[str, dict] = {}
+    for sid in verdict_bad:
+        verdicts = verdict_detail[sid]["verdicts"]
+        majority = max(set(verdicts), key=verdicts.count)
+        deviating = [i for i, v in enumerate(verdicts) if v != majority]
+        k_ = len(verdicts)
+        flip_positions[sid] = {
+            "majority": majority,
+            "deviating_passes": deviating,
+            "all_in_last_two": all(i >= k_ - 2 for i in deviating),
+        }
+
+    judge_stds = list(by_source["judge"]["score_std_per_question"].values())
+    by_source_out = {
+        "rule": {
+            "value": _mean(by_source["rule"]["hits"]),
+            "n": len(by_source["rule"]["hits"]),
+            "inconsistent_ids": by_source["rule"]["inconsistent_ids"],
+        },
+        "judge": {
+            "value": _mean(by_source["judge"]["hits"]),
+            "n": len(by_source["judge"]["hits"]),
+            "inconsistent_ids": by_source["judge"]["inconsistent_ids"],
+            "scores_per_question": by_source["judge"]["scores_per_question"],
+            "score_std": {
+                "rule": "每题 k 次裁判分（0/1/2）的总体标准差（ddof=0）；mean/max 为跨题的均值与最大值",
+                "per_question": by_source["judge"]["score_std_per_question"],
+                "mean": _mean(judge_stds),
+                "max": (max(judge_stds) if judge_stds else None),
+            },
+        },
+    }
 
     # ---- 成功率跨次标准差：按 pass 算成功率，再对 k 个成功率取标准差
     k = max((r.k for r in rows), default=0)
@@ -274,6 +424,8 @@ def stability_section(
             "n": len(verdict_hits),
             "total": len(groups),
             "source_counts": source_counts,
+            "by_source": by_source_out,
+            "flip_positions": flip_positions,
             "inconsistent_ids": verdict_bad,
             "unjudged_ids": unjudged,
             "stale_judge_rows": stale,
@@ -356,6 +508,134 @@ def cost_section(rows: Sequence[RunRecord], samples: Sequence[GoldenSample]) -> 
     }
 
 
+# ================================================================== 模型归属 / 裁判独立性
+# 事实记录（措辞限定：只写「请求名已弃用、实际服务模型为 X」，不写"静默替换"或"厂商未告知"）。
+MODEL_DEPRECATION_NOTE = (
+    "DeepSeek 官方已于 2026-07-24 弃用 deepseek-chat / deepseek-reasoner 两个模型名；"
+    "现由旧名路由至 deepseek-flash（V4.1 Flash）。本仓库 src/config.py 仍硬编码旧名。"
+)
+JUDGE_INDEPENDENCE_UNCONFIRMED = (
+    "本次运行无法确认裁判与被测模型的独立性，开放题判定结果（n=10）应据此折价。"
+)
+JUDGE_INDEPENDENCE_CONFIRMED = "被测与裁判的响应模型 / 指纹不同，独立性成立。"
+
+
+def load_probe(path: Path | str | None) -> dict | None:
+    if path is None:
+        return None
+    target = Path(path)
+    if not target.exists():
+        raise FileNotFoundError(f"模型探针文件不存在：{target}")
+    return json.loads(target.read_text(encoding="utf-8"))
+
+
+def latest_probe(directory: Path | None = None) -> Path | None:
+    files = sorted((directory or RAW_DIR).glob("model_probe_*.json"))
+    return files[-1] if files else None
+
+
+def judge_cache_facts(judge_rows: Sequence[Mapping] | None) -> dict:
+    """裁判链路有没有走缓存：客户端一层看代码，服务端一层看记录。"""
+    rows = list(judge_rows or [])
+    with_hit = [r for r in rows if r.get("prompt_cache_hit_tokens") is not None]
+    return {
+        "client_side_cache": "none",
+        "client_side_note": "src/eval/judge.py DeepSeekJudge.__call__ 每次直接 client.chat.completions.create，无本地缓存层",
+        "server_cache_recorded": bool(with_hit),
+        "n_rows": len(rows),
+        "n_rows_with_cache_hit": len(with_hit),
+        "cache_hit_tokens_total": (int(sum(int(r["prompt_cache_hit_tokens"]) for r in with_hit)) if with_hit else None),
+        "note": (
+            "裁判记录含服务端 prompt_cache_hit_tokens，可判断是否命中"
+            if with_hit
+            else "裁判记录未存 usage（2026-09-12 起 judge_runs.py 才记录），服务端缓存是否命中无法确认"
+        ),
+    }
+
+
+def served_model_section(
+    rows: Sequence[RunRecord],
+    run_meta: Mapping,
+    judge_rows: Sequence[Mapping] | None,
+    probe: Mapping | None,
+) -> dict:
+    """请求模型名 vs 服务端响应模型名；裁判与被测是否落在同一后端。"""
+    from collections import Counter
+
+    requested = run_meta.get("model")
+    served = Counter(r.response_model for r in rows if r.response_model)
+    fps = Counter(r.system_fingerprint for r in rows if r.system_fingerprint)
+    mismatch = bool(served) and any(m != requested for m in served)
+
+    # 单次运行内逐条响应模型是否一致（逐条记录 2026-09-12 起才有）
+    recorded = [r for r in rows if r.response_models]
+    consistent = sum(1 for r in recorded if len({m for m in r.response_models}) == 1)
+    per_run = {
+        "n_recorded_per_call": len(recorded),
+        "n_consistent": consistent,
+        "n_inconsistent": len(recorded) - consistent,
+        "n_unrecorded": len(rows) - len(recorded),
+        "note": "旧格式（2026-09-11）只存每次运行首条响应，无法判断运行内一致性；逐条记录自 2026-09-12 起",
+    }
+
+    # 裁判链路
+    jrows = list(judge_rows or [])
+    judge_requested = sorted({r.get("judge_model") for r in jrows if r.get("judge_model")})
+    judge_served = Counter(r.get("response_model") for r in jrows if r.get("response_model"))
+    judge_fps = Counter(r.get("system_fingerprint") for r in jrows if r.get("system_fingerprint"))
+
+    probe_rows = list((probe or {}).get("results", []))
+    probe_by_name = {p["requested_model"]: p for p in probe_rows}
+    probe_same_backend = None
+    if len(probe_rows) >= 2:
+        pairs = {(p.get("response_model"), p.get("system_fingerprint")) for p in probe_rows}
+        probe_same_backend = len(pairs) == 1
+
+    # 判定：只要能拿到的证据里被测与裁判的 (响应模型, 指纹) 相同，就无法确认独立
+    same_by_records = bool(judge_served) and set(judge_served) == set(served) and set(judge_fps) == set(fps)
+    if judge_served:
+        unconfirmed = same_by_records
+        evidence = "records"
+    elif probe_same_backend is not None:
+        unconfirmed = probe_same_backend
+        evidence = "probe"
+    else:
+        unconfirmed = None
+        evidence = "none"
+    # 独立性只有被证据**证明不同**才算成立；证据显示相同、或根本没有证据，都按"无法确认"处理。
+    verdict = JUDGE_INDEPENDENCE_CONFIRMED if unconfirmed is False else JUDGE_INDEPENDENCE_UNCONFIRMED
+
+    return {
+        "requested_model": requested,
+        "served_models": dict(served),
+        "system_fingerprints": dict(fps),
+        "mismatch": mismatch,
+        "deprecation_note": MODEL_DEPRECATION_NOTE,
+        "per_run_consistency": per_run,
+        "judge_independence": {
+            "judge_requested_model": (judge_requested[0] if len(judge_requested) == 1 else judge_requested) or None,
+            "judge_served_recorded": bool(judge_served),
+            "judge_served_models": dict(judge_served),
+            "judge_system_fingerprints": dict(judge_fps),
+            "probe_file_used": probe is not None,
+            "probed_at_utc": (probe or {}).get("probed_at_utc"),
+            "probe": {
+                name: {
+                    "response_model": p.get("response_model"),
+                    "system_fingerprint": p.get("system_fingerprint"),
+                    "http_status": p.get("http_status"),
+                }
+                for name, p in probe_by_name.items()
+            },
+            "probe_same_backend": probe_same_backend,
+            "models_listed_by_endpoint": (probe or {}).get("models_listed_by_endpoint"),
+            "evidence": evidence,
+            "verdict": verdict,
+        },
+        "judge_cache": judge_cache_facts(judge_rows),
+    }
+
+
 # ================================================================== 对照主评测快照
 def main_snapshot_comparison(
     rows: Sequence[RunRecord],
@@ -417,6 +697,130 @@ def main_snapshot_comparison(
     }
 
 
+# ================================================================== 多步检索行为对照
+def _first_retrieve_docs_from_trace(trace) -> list[str]:
+    for step in trace.steps:
+        for r in step.results:
+            if r.name == "retrieve" and r.retrieved:
+                return [c.doc_id for c in r.retrieved]
+    return []
+
+
+def retrieval_persistence_section(
+    rows: Sequence[RunRecord],
+    samples: Sequence[GoldenSample],
+    snapshot_traces: Mapping[str, object],
+    snapshot_report: Mapping,
+    judge_rows: Sequence[Mapping] | None = None,
+    top_k: int | None = None,
+) -> dict:
+    """逐题对比快照与本次的 retrieve 调用次数；标出"首次检索相同但判定不同"的题。
+
+    首次检索的比较口径：快照取第一次 retrieve 返回的 doc_id 列表；本次运行记录只存
+    去重并集（按检索顺序），取其前 top_k 个作为首次检索（每次检索恒返回 top_k 块时二者等价）。
+    结论句只填数字，不做归因。
+    """
+    from collections import Counter
+
+    k_top = top_k or config.RETRIEVE_TOP_K
+    groups = _by_sample(rows)
+    sample_map = {s.id: s for s in samples}
+    snap_success = {q["id"]: q.get("success") for q in snapshot_report.get("per_question", [])}
+    judge_lookup, _ = _index_judge_rows(rows, judge_rows)
+
+    per_q: dict[str, dict] = {}
+    snap_counts: list[int] = []
+    cur_counts_runs: list[int] = []
+    cur_medians: list[float] = []
+    same_first_diff_verdict: list[str] = []
+    failed_after_miss_no_retry: list[str] = []
+    failed_after_miss_no_retry_any: list[str] = []  # 不要求首次检索与快照相同
+    direction: dict[str, list[str]] = {"decreased": [], "unchanged": [], "increased": []}
+    for sid in sorted(groups):
+        sample = sample_map.get(sid)
+        trace = snapshot_traces.get(sid)
+        if sample is None or trace is None:
+            continue
+        rs = groups[sid]
+        snap_n = sum(1 for x in trace.tool_sequence if x == "retrieve")
+        cur_n = [sum(1 for x in r.tool_sequence if x == "retrieve") for r in rs]
+        snap_first = _first_retrieve_docs_from_trace(trace)
+        cur_first = [r.retrieved_doc_ids[:k_top] for r in rs]
+        identical = bool(snap_first) and all(f == snap_first for f in cur_first)
+        verdicts = [_verdict(sample, r, judge_lookup) for r in rs]
+        snap_v = snap_success.get(sid)
+        verdict_differs = snap_v is not None and any(v is not None and v != snap_v for v in verdicts)
+        expected = {d for g in sample.expected_doc_ids for d in g}
+        first_hit = bool(expected & set(snap_first)) if expected else None
+        # 失败的 pass 里，首次检索未命中标注证据且没有再检索
+        failed_no_retry = bool(expected) and first_hit is False and any(
+            v is False and n == 1 for v, n in zip(verdicts, cur_n)
+        )
+        snap_counts.append(snap_n)
+        cur_counts_runs.extend(cur_n)
+        cur_medians.append(float(np.median(cur_n)))
+        if identical and verdict_differs:
+            same_first_diff_verdict.append(sid)
+            if failed_no_retry:
+                failed_after_miss_no_retry.append(sid)
+        if verdict_differs and failed_no_retry:
+            failed_after_miss_no_retry_any.append(sid)
+        med = float(np.median(cur_n))
+        direction["decreased" if med < snap_n else ("increased" if med > snap_n else "unchanged")].append(sid)
+        per_q[sid] = {
+            "snapshot_retrieves": snap_n,
+            "current_retrieves": cur_n,
+            "current_median": float(np.median(cur_n)),
+            "first_retrieval_identical": identical,
+            "snapshot_first_retrieval": snap_first,
+            "first_retrieval_hits_expected": first_hit,
+            "snapshot_success": snap_v,
+            "current_verdicts": verdicts,
+        }
+
+    snap_med = float(np.median(snap_counts)) if snap_counts else None
+    cur_med = float(np.median(cur_counts_runs)) if cur_counts_runs else None
+    cur_med_q = float(np.median(cur_medians)) if cur_medians else None
+    if snap_med is None or cur_med is None:
+        conclusion = "没有可对照的题（快照轨迹与本次运行记录没有交集）。"
+    else:
+        verb = "降至" if cur_med < snap_med else "变为"
+        conclusion = (
+            f"同一代码与同一索引下，retrieve 调用次数中位数由 {snap_med:.1f} {verb} {cur_med:.1f}"
+            f"；{len(failed_after_miss_no_retry)} 题因首次检索未命中后未再检索而失败。"
+        )
+    return {
+        "rule": (
+            "retrieve 调用次数 = 工具序列里 retrieve 的出现次数（不折叠）；快照为单次运行，本次为 k 次；"
+            f"首次检索 = 快照第一次 retrieve 的 doc_id 列表 vs 本次去重并集的前 {k_top} 个"
+        ),
+        "n_questions": len(per_q),
+        "snapshot_median": snap_med,
+        "snapshot_distribution": dict(sorted(Counter(snap_counts).items())),
+        "current_median_runs": cur_med,
+        "current_median_of_question_medians": cur_med_q,
+        "current_distribution_runs": dict(sorted(Counter(cur_counts_runs).items())),
+        "n_current_runs": len(cur_counts_runs),
+        "same_first_retrieval_different_verdict": same_first_diff_verdict,
+        "failed_after_first_miss_without_retry": failed_after_miss_no_retry,
+        "failed_after_first_miss_without_retry_any_first": failed_after_miss_no_retry_any,
+        "direction_counts": {k_: len(v) for k_, v in direction.items()},
+        "direction_ids": direction,
+        "conclusion": conclusion,
+        "per_question": per_q,
+    }
+
+
+def load_snapshot_traces(path: Path | str | None = None):
+    """快照轨迹（reports/traces_latest.jsonl，gitignore）；不存在返回 None。"""
+    from src.eval import report as report_mod
+
+    target = Path(path) if path else (config.REPORTS_DIR / "traces_latest.jsonl")
+    if not target.exists():
+        return None
+    return report_mod.load_traces(target)
+
+
 # ================================================================== 汇总
 def build_summary(
     rows: Sequence[RunRecord],
@@ -427,6 +831,8 @@ def build_summary(
     embedder=None,
     raw_path: Path | str | None = None,
     judge_path: Path | str | None = None,
+    probe: Mapping | None = None,
+    probe_path: Path | str | None = None,
 ) -> dict:
     run_meta = dict(run_meta or {})
     k = int(run_meta.get("k") or max((r.k for r in rows), default=0))
@@ -435,6 +841,15 @@ def build_summary(
         answer_similarity_section(rows, samples, embedder) if embedder is not None else None
     )
     stability["main_snapshot_comparison"] = main_snapshot_comparison(rows, samples, judge_rows)
+    snap_traces = load_snapshot_traces()
+    latest = config.REPORTS_DIR / "latest.json"
+    stability["retrieval_persistence"] = (
+        retrieval_persistence_section(
+            rows, samples, snap_traces, json.loads(latest.read_text(encoding="utf-8")), judge_rows=judge_rows
+        )
+        if snap_traces is not None and latest.exists()
+        else None
+    )
     return {
         "meta": {
             "analyzed_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -443,6 +858,8 @@ def build_summary(
             "judge_rows_given": judge_rows is not None,
             "judge_file": _relative(judge_path),
             "judge_sha256": sha256_of(judge_path) if judge_path and Path(judge_path).exists() else None,
+            "probe_file": _relative(probe_path),
+            "probe_sha256": sha256_of(probe_path) if probe_path and Path(probe_path).exists() else None,
             "n_rows": len(rows),
             "n_questions": len({r.sample_id for r in rows}),
             "k": k,
@@ -450,6 +867,7 @@ def build_summary(
             "system_fingerprints": sorted({r.system_fingerprint for r in rows if r.system_fingerprint}),
             "run_meta": run_meta,
         },
+        "model_attribution": served_model_section(rows, run_meta, judge_rows, probe),
         "latency": latency_section(rows),
         "stability": stability,
         "cost": cost_section(rows, samples),
@@ -479,11 +897,30 @@ def render_markdown(summary: dict) -> str:
     k = m["k"]
     n_rows = m["n_rows"]
     n_q = m.get("n_questions")
-    tag = f"n={n_rows}（{n_q} 题 × k={k}），temperature={rm.get('temperature', '—')}，model={rm.get('model', '—')}"
+    attr0 = summary.get("model_attribution") or {}
+    served_names = "/".join(sorted(attr0.get("served_models", {}))) or "未记录"
+    tag = (
+        f"n={n_rows}（{n_q} 题 × k={k}），temperature={rm.get('temperature', '—')}，"
+        f"model=请求 {rm.get('model', '—')} / 响应 {served_names}"
+    )
 
+    attr = summary.get("model_attribution") or {}
+    served_str = ", ".join(f"`{k_}`×{v}" for k_, v in sorted(attr.get("served_models", {}).items())) or "—"
+    fp_str = ", ".join(f"`{k_}`×{v}" for k_, v in sorted(attr.get("system_fingerprints", {}).items())) or "—"
     lines = [
         "# 稳定性与延迟分解报告（脚本生成，勿手改）",
         "",
+    ]
+    if attr.get("mismatch"):
+        lines += [
+            "> **告警：请求模型名与服务端响应模型名不一致。**",
+            f"> 请求 `{attr.get('requested_model')}`，全部 {m['n_rows']} 次运行的响应 `model` 字段为 {served_str}"
+            f"（system_fingerprint {fp_str}）。",
+            f"> {attr.get('deprecation_note')}",
+            "> 本报告中所有「被测模型」的数字，实际服务模型均为上述响应模型名。",
+            "",
+        ]
+    lines += [
         f"> 本文件由 `python -m stability.analyze` 从 `{m.get('raw_file')}` 生成；",
         f"> 原始产物 sha256 = `{m.get('raw_sha256')}`；分析时间 {m['analyzed_at_utc']}。",
         "> 每个数字旁都带样本量 n、重复次数 k 与环境标识（PERF_SPEC §0.3）。",
@@ -492,7 +929,10 @@ def render_markdown(summary: dict) -> str:
         "",
         "| 项 | 值 |",
         "|---|---|",
-        f"| 被测模型 | 请求 `{rm.get('model', '—')}`；响应 model 字段：{m.get('served_models') or '—'}；system_fingerprint：{m.get('system_fingerprints') or '—'} |",
+        f"| 请求模型名（config.MODEL_NAME） | `{rm.get('model', '—')}` |",
+        f"| 实际响应模型名（响应 `model` 字段，按行计数） | {served_str}{'  **← 与请求名不一致**' if attr.get('mismatch') else ''} |",
+        f"| system_fingerprint（按行计数） | {fp_str} |",
+        f"| 单次运行内响应模型一致性 | 逐条记录 {attr.get('per_run_consistency', {}).get('n_recorded_per_call', 0)} 次运行：一致 {attr.get('per_run_consistency', {}).get('n_consistent', 0)}、不一致 {attr.get('per_run_consistency', {}).get('n_inconsistent', 0)}；未逐条记录 {attr.get('per_run_consistency', {}).get('n_unrecorded', 0)} 次（{attr.get('per_run_consistency', {}).get('note', '')}） |",
         f"| temperature | {rm.get('temperature', '—')} |",
         f"| seed | {rm.get('seed', '—')} |",
         f"| embedding | {rm.get('embedding_model', '—')}（query 指令前缀：{rm.get('use_query_instruction', '—')}） |",
@@ -524,6 +964,54 @@ def render_markdown(summary: dict) -> str:
         f"单次 LLM 调用（n={sc['n']} 次）：P50 {_s(sc['p50'])} / P95 {_s(sc['p95'])} / P99 {_s(sc['p99'])}；"
         f"每次运行 LLM 调用次数 P50 {_f(lat['llm_calls_per_run']['p50'], 1)}、最大 {_f(lat['llm_calls_per_run']['max'], 0)}。",
         "",
+    ]
+    bc = lat.get("by_cache") or {}
+    if bc:
+        lines += ["### 按服务端缓存命中拆分（端到端）", ""]
+        if bc.get("headline_group") == "miss":
+            lines += [
+                f"分组口径：{bc.get('rule')}。",
+                "",
+                "| 组 | n | P50 | P95 | P99 | 均值 |",
+                "|---|---|---|---|---|---|",
+                f"| 未命中（cache_hit == 0） | {bc['miss']['n']} | {_s(bc['miss']['p50'])} | {_s(bc['miss']['p95'])} | {_s(bc['miss']['p99'])} | {_s(bc['miss']['mean'])} |",
+                f"| 命中（cache_hit > 0） | {bc['hit']['n']} | {_s(bc['hit']['p50'])} | {_s(bc['hit']['p95'])} | {_s(bc['hit']['p99'])} | {_s(bc['hit']['mean'])} |",
+                "",
+                f"主结论按未命中组：P50 {_s(bc['miss']['p50'])} / P95 {_s(bc['miss']['p95'])} / P99 {_s(bc['miss']['p99'])}（n={bc['miss']['n']}）。",
+                "",
+            ]
+        else:
+            lines += [
+                f"本批数据无法按缓存命中拆分：{bc['hit']['n']} 次有效运行的运行级 cache_hit 全部 > 0，未命中组 n=0。"
+                f"{bc.get('caveat')}。上文端到端分位数即为全部有效行。",
+                "",
+            ]
+    obs = lat.get("pass0_observation")
+    if obs:
+        pp = obs["per_pass"]
+        lines += [
+            "### 按 pass 看单次 LLM 调用延迟、轨迹长度与 token",
+            "",
+            f"轨迹长度众数 n_llm_calls = {obs['modal_n_llm_calls']}；「控制长度」列只取 n_llm_calls 等于众数的运行。",
+            "",
+            "| pass | n | 端到端 P50 | 端到端 P50（控制长度） | n（控制长度） | 单次 LLM 调用 P50 | 单次 P95 | 调用数 | 平均 n_llm_calls | 平均 token | 平均缓存命中 |",
+            "|---|---|---|---|---|---|---|---|---|---|---|",
+        ]
+        for i, v in pp.items():
+            lines.append(
+                f"| {i} | {v['n']} | {_s(v['e2e_p50'])} | {_s(v['e2e_p50_at_modal_calls'])} | {v['n_at_modal_calls']} | {_s(v['single_call_p50'])} | {_s(v['single_call_p95'])} | {v['n_calls']} | {_f(v['mean_n_llm_calls'], 2)} | {_f(v['mean_tokens'], 0)} | {_f(v['mean_cache_hit'], 0)} |"
+            )
+        lines += [
+            "",
+            f"pass 0（无跨轮缓存）端到端 P50 {_s(obs['pass0_p50'])}，后续 pass 的 P50 为 "
+            + "、".join(f"pass {i} {_s(v)}" for i, v in obs["later_p50_by_pass"].items())
+            + f"；pass 0 {'低于' if obs['pass0_faster_than_all_later'] else '不低于'}全部后续 pass。"
+            f"单次 LLM 调用 P50 各 pass {'接近' if obs['single_call_close'] else '不接近'}（{obs['single_call_close_rule']}）；"
+            f"控制轨迹长度后 pass 0 {'仍' if obs['length_controlled_gap_persists'] else '不再'}低于全部后续 pass。"
+            f"—— **{obs['label']}**。",
+            "",
+        ]
+    lines += [
         f"**结论**：LLM 调用占端到端延迟的 {_f(lat['share_median']['llm'] * 100 if lat['share_median']['llm'] is not None else None, 1)}%（占比中位数），"
         f"检索占 {_f(lat['share_median']['retrieve'] * 100 if lat['share_median']['retrieve'] is not None else None, 1)}%，"
         f"工具占 {_f(lat['share_median']['tool'] * 100 if lat['share_median']['tool'] is not None else None, 1)}%，"
@@ -541,7 +1029,10 @@ def render_markdown(summary: dict) -> str:
     lines += [
         f"| 轨迹自洽率（严格） | **{_f(tj['value'])}** | n={tj['n']}/{tj['total']}，k={k} | {tj['rule']} |",
         f"| 轨迹自洽率（折叠连续重复） | {_f(tj['collapsed_value'])} | n={tj['n']}/{tj['total']}，k={k} | 参考口径 |",
-        f"| 判定自洽率 | **{_f(vc['value'])}** | n={vc['n']}/{vc['total']}（规则 {vc['source_counts']['rule']}、裁判 {vc['source_counts']['judge']}），k={k} | {vc['rule']} |",
+        f"| 判定自洽率（合并） | **{_f(vc['value'])}** | n={vc['n']}/{vc['total']}（规则 {vc['source_counts']['rule']}、裁判 {vc['source_counts']['judge']}），k={k} | {vc['rule']} |",
+        f"| 判定自洽率 · 规则路（闭合题） | **{_f(vc['by_source']['rule']['value'])}** | n={vc['by_source']['rule']['n']}，k={k} | answer_keys 全命中；不一致：{vc['by_source']['rule']['inconsistent_ids'] or '无'} |",
+        f"| 判定自洽率 · 裁判路（开放题） | **{_f(vc['by_source']['judge']['value'])}** | n={vc['by_source']['judge']['n']}，k={k} | 裁判分 ≥ {config.OPEN_SUCCESS_THRESHOLD}；不一致：{vc['by_source']['judge']['inconsistent_ids'] or '无'} |",
+        f"| 裁判分跨次标准差（裁判路） | 均值 **{_f(vc['by_source']['judge']['score_std']['mean'])}**，最大 **{_f(vc['by_source']['judge']['score_std']['max'])}** | n={vc['by_source']['judge']['n']} 题，每题 k={k} 次 | {vc['by_source']['judge']['score_std']['rule']} |",
     ]
     if sim is None:
         lines.append("| 答案相似度 | 未计算 | — | 本次分析未加载 embedding（--no-embed 或 CI） |")
@@ -564,15 +1055,59 @@ def render_markdown(summary: dict) -> str:
         lines.append("轨迹不自洽的题：无。")
     if vc["inconsistent_ids"]:
         lines.append(f"判定不自洽的题：{', '.join(vc['inconsistent_ids'])}。")
+        fp = vc.get("flip_positions", {})
         for sid in vc["inconsistent_ids"]:
-            lines.append(f"- `{sid}`：{vc['detail'][sid]['verdicts']}")
+            pos = fp.get(sid, {})
+            lines.append(
+                f"- `{sid}`：{vc['detail'][sid]['verdicts']}；偏离多数派的 pass：{pos.get('deviating_passes')}"
+                f"{'（全部落在最后两个 pass）' if pos.get('all_in_last_two') else ''}"
+            )
+        last_two = [sid for sid in vc["inconsistent_ids"] if fp.get(sid, {}).get("all_in_last_two")]
+        lines.append(
+            f"翻转位置与运行顺序的关系：{len(last_two)}/{len(vc['inconsistent_ids'])} 题的偏离全部落在最后两个 pass；"
+            f"k={k} 不足以判定翻转是否与运行顺序相关，需更大的 k。"
+        )
     else:
         lines.append("判定不自洽的题：无。")
     if vc["unjudged_ids"]:
         lines.append(f"未计入判定自洽率的开放题（无逐次裁判分）：{', '.join(vc['unjudged_ids'])}。")
     if vc["stale_judge_rows"]:
         lines.append(f"⚠ 指纹对不上而被丢弃的裁判分：{vc['stale_judge_rows']}。")
+    js = vc["by_source"]["judge"]
+    if js["scores_per_question"]:
+        lines.append("裁判路逐题 k 次裁判分（0/1/2）与标准差：")
+        for sid, scores in js["scores_per_question"].items():
+            lines.append(f"- `{sid}`：{scores}，std={_f(js['score_std']['per_question'][sid])}")
+    ind = attr.get("judge_independence") or {}
+    jc = attr.get("judge_cache") or {}
     lines += [
+        "",
+        "### 裁判独立性核验",
+        "",
+        "| 链路 | 请求模型名 | 响应 model | system_fingerprint | 证据 |",
+        "|---|---|---|---|---|",
+        f"| 被测（Agent） | `{attr.get('requested_model')}` | {served_str} | {fp_str} | 本次 {m['n_rows']} 行运行记录 |",
+    ]
+    jreq = ind.get("judge_requested_model")
+    if ind.get("judge_served_recorded"):
+        jm = ", ".join(f"`{k_}`×{v}" for k_, v in sorted(ind.get("judge_served_models", {}).items()))
+        jf = ", ".join(f"`{k_}`×{v}" for k_, v in sorted(ind.get("judge_system_fingerprints", {}).items()))
+        lines.append(f"| 裁判（judge_runs） | `{jreq}` | {jm} | {jf} | 本次裁判记录 |")
+    else:
+        lines.append(f"| 裁判（judge_runs） | `{jreq}` | 未记录 | 未记录 | 本次裁判记录未存响应字段（2026-09-12 起才记录） |")
+    for name, pr in (ind.get("probe") or {}).items():
+        lines.append(f"| 探针 | `{name}` | `{pr.get('response_model')}` | `{pr.get('system_fingerprint')}` | `{m.get('probe_file')}`（{ind.get('probed_at_utc')}，HTTP {pr.get('http_status')}） |")
+    lines += [
+        "",
+        f"探针同一时刻两个请求名是否落在同一 (响应 model, 指纹)：{ind.get('probe_same_backend')}；"
+        f"端点 `/models` 列出的模型：{ind.get('models_listed_by_endpoint')}。",
+        "",
+        f"**{ind.get('verdict')}**（判断依据：{ind.get('evidence')}）",
+        "",
+        f"裁判链路缓存：客户端 {jc.get('client_side_cache')}（{jc.get('client_side_note')}）；"
+        f"服务端：{jc.get('note')}"
+        + (f"，命中 token 合计 {jc.get('cache_hit_tokens_total')}（n={jc.get('n_rows_with_cache_hit')}/{jc.get('n_rows')} 行）" if jc.get("server_cache_recorded") else "")
+        + "。",
         "",
         "### 解读",
         "",
@@ -592,6 +1127,51 @@ def render_markdown(summary: dict) -> str:
             )
     if tj["value"] is not None and tj["value"] < 1.0:
         lines.append("temperature=0 **没有**给出确定性输出：轨迹自洽率 < 1.0 不是 bug，它就是结论本身（PERF_SPEC B3；见 LIMITATIONS.md）。")
+    rp = st.get("retrieval_persistence")
+    if rp:
+        lines += [
+            "",
+            "### 多步检索行为对照（快照单次 vs 本次 k 次）",
+            "",
+            f"口径：{rp['rule']}。可对照 n={rp['n_questions']} 题。",
+            "",
+            "| | 快照（2026-09-06，单次） | 本次（k 次运行） |",
+            "|---|---|---|",
+            f"| retrieve 调用次数中位数 | {_f(rp['snapshot_median'], 1)}（n={rp['n_questions']} 题） | {_f(rp['current_median_runs'], 1)}（n={rp['n_current_runs']} 次运行）；题内中位数再取中位数 {_f(rp['current_median_of_question_medians'], 1)} |",
+            f"| 次数分布（次数: 题/运行数） | {rp['snapshot_distribution']} | {rp['current_distribution_runs']} |",
+            "",
+            "| 题 | 快照 retrieve 次数 | 本次各 pass 次数 | 本次中位数 | 首次检索 doc_id 相同 | 快照判定 | 本次判定 |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for sid, q in rp["per_question"].items():
+            lines.append(
+                f"| {sid} | {q['snapshot_retrieves']} | {q['current_retrieves']} | {_f(q['current_median'], 1)} | "
+                f"{'是' if q['first_retrieval_identical'] else '否'} | {q['snapshot_success']} | {q['current_verdicts']} |"
+            )
+        same = rp["same_first_retrieval_different_verdict"]
+        lines += [
+            "",
+            f"首次检索 doc_id 相同但判定不同的题（n={len(same)}）：{', '.join(same) if same else '无'}。"
+            "这类题的检索输入没有变化，差异出在首次检索之后的行为。",
+        ]
+        for sid in same:
+            q = rp["per_question"][sid]
+            lines.append(
+                f"- `{sid}`：快照 {q['snapshot_retrieves']} 次 retrieve、判定 {q['snapshot_success']}；本次 {q['current_retrieves']} 次、判定 {q['current_verdicts']}；"
+                f"首次检索命中标注证据：{q['first_retrieval_hits_expected']}"
+            )
+        dc = rp["direction_counts"]
+        lines += [
+            "",
+            f"逐题方向（本次题内中位数 vs 快照次数）：减少 {dc['decreased']} 题 {rp['direction_ids']['decreased']}；"
+            f"不变 {dc['unchanged']} 题；增加 {dc['increased']} 题 {rp['direction_ids']['increased']}。",
+            "",
+            f"**{rp['conclusion']}**",
+            f"（「因首次检索未命中后未再检索而失败」的判定条件：有标注证据、快照首次检索未命中、失败的 pass 里 retrieve 次数为 1，"
+            f"且首次检索 doc_id 与快照相同；命中：{rp['failed_after_first_miss_without_retry'] or '无'}。"
+            f"放宽「首次检索相同」这一条后命中：{rp['failed_after_first_miss_without_retry_any_first'] or '无'}。）",
+        ]
+
     cmp_ = st.get("main_snapshot_comparison")
     if cmp_:
         rates = [x for x in sp["rates"] if x is not None]
@@ -613,8 +1193,8 @@ def render_markdown(summary: dict) -> str:
                 )
             lines += [
                 "",
-                "判定口径两边相同，差异只能来自被测模型的行为变化或裁判波动——这正是回归闸（闸 B）要抓的漂移；"
-                "要确认，需重跑一次主评测（`python -m src.eval.report`）让闸 B 正式比对。",
+                "两边判定口径相同（判定代码与黄金集在两个 commit 间逐字相同）。快照未记录响应模型名；"
+                f"本次响应模型名见顶部。差异的归因不在本报告范围内；正式比对需重跑主评测（`python -m src.eval.report`）走闸 B。",
             ]
         else:
             lines.append("没有任何题的判定与快照不同。")
@@ -662,6 +1242,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="原始运行记录 -> 稳定性 / 延迟报告")
     parser.add_argument("--raw", type=str, default=None, help="run_*.jsonl 路径（默认取最新）")
     parser.add_argument("--judge", type=str, default=None, help="逐次裁判分 judge_*.jsonl（可选）")
+    parser.add_argument("--probe", type=str, default=None, help="模型探针 model_probe_*.json（默认取最新；--no-probe 不用）")
+    parser.add_argument("--no-probe", action="store_true", help="不读取模型探针文件")
     parser.add_argument("--no-embed", action="store_true", help="不算答案相似度（不加载 BGE）")
     parser.add_argument("--summary", type=str, default=str(SUMMARY_PATH))
     parser.add_argument("--report", type=str, default=str(REPORT_PATH))
@@ -672,6 +1254,8 @@ def main(argv: list[str] | None = None) -> int:
     samples = load_golden_set()
     run_meta = load_run_meta(raw)
     judge_rows = load_judge_rows(args.judge)
+    probe_path = None if args.no_probe else (Path(args.probe) if args.probe else latest_probe())
+    probe = load_probe(probe_path)
 
     embedder = None
     if not args.no_embed:
@@ -682,7 +1266,7 @@ def main(argv: list[str] | None = None) -> int:
 
     summary = build_summary(
         rows, samples, run_meta=run_meta, judge_rows=judge_rows, embedder=embedder,
-        raw_path=raw, judge_path=args.judge,
+        raw_path=raw, judge_path=args.judge, probe=probe, probe_path=probe_path,
     )
     write_outputs(summary, Path(args.summary), Path(args.report))
     print(render_markdown(summary))

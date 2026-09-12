@@ -159,3 +159,42 @@ def test_no_tracked_file_looks_like_a_secret_file():
         and re.search(r"(api|key|secret|token|credential|passwd|password)", f, re.I)
     ]
     assert not suspicious, f"这些已追踪文件名字像密钥：{suspicious}"
+
+
+# ------------------------------------------------------------------ push 前安全扫描（CLAUDE.md §13.4）
+def test_security_scan_has_no_unexempted_hits():
+    """scripts/security_scan.py 在 git add -A 会带上的全部文件上零未豁免命中。
+
+    豁免只认 EXEMPTIONS 里带出处的条目；本机用户名 / 主机名的字面命中不在这里断言
+    （CI 机器上的用户名如 runner 会撞上正常词），由人在 push 前看扫描原文核对。
+    """
+    from scripts import security_scan
+
+    result = security_scan.scan(history=False, identity=False)
+    assert result.files, "扫描对象为空——git ls-files 没跑起来"
+    assert result.env_ignored and not result.env_tracked
+    offenders = [f"{h.category}: {h.path}:{h.line}: {h.token}" for h in result.violations]
+    assert not offenders, "未豁免的安全扫描命中：\n" + "\n".join(offenders)
+
+
+def test_security_scan_exemptions_all_carry_a_reason():
+    from scripts import security_scan
+
+    for category, items in security_scan.EXEMPTIONS.items():
+        for token, reason in items.items():
+            assert token and reason and len(reason) > 8, (category, token, reason)
+
+
+def test_security_scan_catches_a_fresh_local_path_and_key():
+    """扫描器本身要能抓到东西——否则零命中只是它瞎了。"""
+    from scripts import security_scan
+
+    # 用拼接构造样本，免得本测试文件自己被扫描器命中
+    drive, bs = "D" + ":", "\\" * 2  # JSON 文本里反斜杠翻倍的写法
+    text = f'x = "{drive}{bs}xiangmu{bs}rag-agent-eval-harness{bs}reports{bs}x.jsonl"\nk = "sk-' + "a" * 24 + '"\n'
+    hits = security_scan.scan_text("fake.py", text)
+    cats = {h.category for h in hits if h.is_violation}
+    assert {"local_path", "api_key"} <= cats
+    # 已知豁免的字符串命中但不算违规
+    exempt = security_scan.scan_text("fake.json", f'a = "{drive}{bs}xiangmu{bs}credit-risk-mlops"')
+    assert exempt and all(h.exempt_reason for h in exempt if h.category == "local_path")

@@ -30,6 +30,10 @@ class Latency(BaseModel):
     n_retrieve_calls: int = 0
     n_tool_calls: int = 0
     llm_call_s: list[float] = Field(default_factory=list)  # 逐次 LLM 调用耗时
+    # 逐次 LLM 调用的服务端缓存命中 / 未命中 token（2026-09-12 起记录；旧记录为空列表）。
+    # 有了它才能把"首次调用未命中"和"同一运行内后续调用命中前缀"分开看。
+    llm_call_cache_hit: list[int | None] = Field(default_factory=list)
+    llm_call_cache_miss: list[int | None] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -66,9 +70,13 @@ class RunRecord(BaseModel):
     latency: Latency
     tokens: Tokens
     error: str | None = None
-    # 模型响应里自带的版本线索（DeepSeek 不暴露权重版本，能记的只有这两项）
+    # 模型响应里自带的版本线索（DeepSeek 不暴露权重版本，能记的只有这两项）。
+    # response_model / system_fingerprint 取本次运行**第一条**响应（2026-09-11 起的旧格式）；
+    # response_models / system_fingerprints 逐条记录（2026-09-12 起），旧记录为空列表。
     response_model: str | None = None
     system_fingerprint: str | None = None
+    response_models: list[str | None] = Field(default_factory=list)
+    system_fingerprints: list[str | None] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

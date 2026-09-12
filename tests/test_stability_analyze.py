@@ -323,3 +323,198 @@ def test_summary_is_deterministic_for_same_input():
     a["meta"].pop("analyzed_at_utc")
     b["meta"].pop("analyzed_at_utc")
     assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
+
+
+# ================================================================== 2026-09-12 追加口径
+# 模型归属 / 裁判独立性 / 缓存拆分 / 判定自洽率分路 / 单次运行内响应模型一致性
+def _row_served(sid, i, *, served="deepseek-flash", fp="fp1", per_call=None, cache_hit=640, answer="对", k=3):
+    r = _row(sid, i, answer=answer, k=k)
+    data = r.model_dump()
+    data["response_model"] = served
+    data["system_fingerprint"] = fp
+    data["response_models"] = per_call if per_call is not None else []
+    data["system_fingerprints"] = [fp] * len(per_call) if per_call is not None else []
+    data["tokens"]["cache_hit"] = cache_hit
+    return RunRecord(**data)
+
+
+def test_latency_by_cache_splits_on_run_level_cache_hit_and_reports_n():
+    rows = [_row_served("q1", 0, cache_hit=0), _row_served("q1", 1, cache_hit=500), _row_served("q1", 2, cache_hit=900)]
+    lat = analyze.latency_section(rows)
+    assert lat["by_cache"]["miss"]["n"] == 1 and lat["by_cache"]["hit"]["n"] == 2
+    assert lat["by_cache"]["miss"]["p50"] is not None and lat["by_cache"]["hit"]["p95"] is not None
+
+
+def test_latency_by_cache_miss_group_empty_is_none_not_zero():
+    rows = [_row_served("q1", i, cache_hit=640) for i in range(3)]
+    lat = analyze.latency_section(rows)
+    assert lat["by_cache"]["miss"]["n"] == 0 and lat["by_cache"]["miss"]["p50"] is None
+    assert lat["by_cache"]["headline_group"] == "hit"  # 未命中组为空时不能拿 0 冒充
+
+
+def test_pass0_faster_than_later_passes_is_flagged_as_unexplained():
+    rows = [_row_served("q1", 0), _row_served("q2", 0), _row_served("q1", 1), _row_served("q2", 1), _row_served("q1", 2), _row_served("q2", 2)]
+    for r in rows:
+        r.latency.total_s = 1.0 if r.run_index == 0 else 2.0
+    lat = analyze.latency_section(rows)
+    obs = lat["pass0_observation"]
+    assert obs["pass0_p50"] == pytest.approx(1.0) and obs["later_p50_min"] == pytest.approx(2.0)
+    assert obs["pass0_faster_than_all_later"] is True
+    assert "未解释" in obs["label"]
+
+
+def test_verdict_consistency_is_split_by_source_with_separate_denominators():
+    samples = [_sample("c1", keys=["对"]), _sample("c2", keys=["对"]), _sample("o1", "open")]
+    rows = [
+        _row("c1", 0, answer="对"), _row("c1", 1, answer="对"),
+        _row("c2", 0, answer="对"), _row("c2", 1, answer="错"),
+        _row("o1", 0, answer="x"), _row("o1", 1, answer="y"),
+    ]
+    judge_rows = [
+        {"sample_id": "o1", "run_index": 0, "answer_sha1": rows[4].answer_sha1, "judge_score": 2},
+        {"sample_id": "o1", "run_index": 1, "answer_sha1": rows[5].answer_sha1, "judge_score": 1},
+    ]
+    v = analyze.stability_section(rows, samples, judge_rows=judge_rows)["verdict_consistency"]
+    assert v["by_source"]["rule"]["value"] == pytest.approx(0.5) and v["by_source"]["rule"]["n"] == 2
+    assert v["by_source"]["judge"]["value"] == pytest.approx(0.0) and v["by_source"]["judge"]["n"] == 1
+    std = v["by_source"]["judge"]["score_std"]
+    assert std["per_question"]["o1"] == pytest.approx(np.std([2, 1], ddof=0))
+    assert std["mean"] == pytest.approx(np.std([2, 1], ddof=0)) and std["max"] == pytest.approx(np.std([2, 1], ddof=0))
+
+
+def test_served_model_section_flags_mismatch_and_counts_per_run_consistency():
+    rows = [
+        _row_served("q1", 0, per_call=["deepseek-flash", "deepseek-flash"]),
+        _row_served("q1", 1, per_call=["deepseek-flash", "other"]),
+        _row_served("q1", 2, per_call=None),  # 旧格式：只有首条
+    ]
+    sec = analyze.served_model_section(rows, run_meta={"model": "deepseek-chat"}, judge_rows=None, probe=None)
+    assert sec["requested_model"] == "deepseek-chat"
+    assert sec["served_models"] == {"deepseek-flash": 3}
+    assert sec["mismatch"] is True
+    pr = sec["per_run_consistency"]
+    assert pr["n_recorded_per_call"] == 2 and pr["n_consistent"] == 1 and pr["n_unrecorded"] == 1
+
+
+def test_served_model_section_no_mismatch_when_names_agree():
+    rows = [_row_served("q1", 0, served="deepseek-chat")]
+    sec = analyze.served_model_section(rows, run_meta={"model": "deepseek-chat"}, judge_rows=None, probe=None)
+    assert sec["mismatch"] is False
+
+
+def test_judge_independence_uses_probe_and_fixed_wording():
+    rows = [_row_served("q1", 0, served="deepseek-flash", fp="fpX")]
+    probe = {
+        "probed_at_utc": "2026-09-12T00:00:00+00:00",
+        "results": [
+            {"requested_model": "deepseek-chat", "response_model": "deepseek-flash", "system_fingerprint": "fpX", "http_status": 200},
+            {"requested_model": "deepseek-reasoner", "response_model": "deepseek-flash", "system_fingerprint": "fpX", "http_status": 200},
+        ],
+        "models_listed_by_endpoint": ["deepseek-flash"],
+    }
+    judge_rows = [{"sample_id": "q1", "run_index": 0, "answer_sha1": rows[0].answer_sha1, "judge_score": 2, "judge_model": "deepseek-reasoner"}]
+    sec = analyze.served_model_section(rows, run_meta={"model": "deepseek-chat"}, judge_rows=judge_rows, probe=probe)
+    ind = sec["judge_independence"]
+    assert ind["judge_requested_model"] == "deepseek-reasoner"
+    assert ind["judge_served_recorded"] is False  # 09-11 的裁判行没存响应字段
+    assert ind["probe_same_backend"] is True
+    assert ind["verdict"] == analyze.JUDGE_INDEPENDENCE_UNCONFIRMED
+    assert "裁判即被测" not in ind["verdict"] and "静默" not in analyze.MODEL_DEPRECATION_NOTE
+
+
+def test_judge_cache_facts_report_unrecorded_when_rows_lack_usage():
+    judge_rows = [{"sample_id": "q1", "run_index": 0, "answer_sha1": "x", "judge_score": 2}]
+    facts = analyze.judge_cache_facts(judge_rows)
+    assert facts["client_side_cache"] == "none"
+    assert facts["server_cache_recorded"] is False
+    judge_rows[0]["prompt_cache_hit_tokens"] = 128
+    facts = analyze.judge_cache_facts(judge_rows)
+    assert facts["server_cache_recorded"] is True and facts["n_rows_with_cache_hit"] == 1
+
+
+def test_report_has_warning_block_on_top_when_served_model_differs():
+    samples = [_sample("q1", keys=["对"])]
+    rows = [_row_served("q1", i) for i in range(3)]
+    summary = analyze.build_summary(rows, samples, run_meta={"run_id": "t", "k": 3, "model": "deepseek-chat"}, embedder=None)
+    md = analyze.render_markdown(summary)
+    head = md[:600]
+    assert "告警" in head and "deepseek-flash" in head
+    assert analyze.JUDGE_INDEPENDENCE_UNCONFIRMED in md
+
+
+# ================================================================== 2026-09-12 追加口径（第二批）
+def test_pass0_observation_reports_per_pass_single_call_and_length_controlled_p50():
+    rows = []
+    for p in range(3):
+        for q in ("q1", "q2", "q3"):
+            r = _row_served(q, p)
+            r.latency.n_llm_calls = 2
+            r.latency.llm_call_s = [0.5, 0.5]
+            r.latency.total_s = 1.0 if p == 0 else 1.4  # 单次调用相同、调用数相同，端到端仍不同
+            rows.append(r)
+    obs = analyze.pass0_observation(rows)
+    assert obs["single_call_close"] is True
+    assert obs["per_pass"]["0"]["single_call_p50"] == pytest.approx(0.5)
+    assert obs["per_pass"]["1"]["e2e_p50_at_modal_calls"] == pytest.approx(1.4)
+    assert obs["length_controlled_gap_persists"] is True
+    assert "未解释" in obs["label"]
+
+
+def test_pass0_observation_relabels_when_gap_vanishes_at_fixed_length():
+    rows = []
+    # pass 0：三题都是 2 次调用；pass 1：q2/q3 多了一次调用。单次调用耗时处处相同，
+    # pass 0 的端到端 P50 更低只因为轨迹更短；控制长度（2 次）后两边都是 1.0，差距消失。
+    plan = {0: {"q1": 2, "q2": 2, "q3": 2}, 1: {"q1": 2, "q2": 3, "q3": 3}}
+    for p in range(2):
+        for q, calls in plan[p].items():
+            r = _row_served(q, p, k=2)
+            r.latency.n_llm_calls = calls
+            r.latency.llm_call_s = [0.5] * calls
+            r.latency.total_s = 1.0 if calls == 2 else 1.6
+            rows.append(r)
+    obs = analyze.pass0_observation(rows)
+    assert obs["pass0_faster_than_all_later"] is True
+    assert obs["length_controlled_gap_persists"] is False
+    assert "轨迹长度" in obs["label"]
+
+
+def test_verdict_flip_positions_are_listed_per_question():
+    samples = [_sample("q1", keys=["对"])]
+    rows = [_row("q1", i, answer=a, k=5) for i, a in enumerate(["错", "对", "对", "对", "错"])]
+    st = analyze.stability_section(rows, samples)
+    flips = st["verdict_consistency"]["flip_positions"]
+    assert flips["q1"]["majority"] is True
+    assert flips["q1"]["deviating_passes"] == [0, 4]
+    assert flips["q1"]["all_in_last_two"] is False
+
+
+def test_retrieval_persistence_section_counts_and_flags(tmp_path):
+    from src.agent.trace import AgentTrace, RetrievedChunk, ToolCall, ToolResult, TraceStep
+
+    def trace(retrieve_queries, first_docs):
+        steps = []
+        for i, q in enumerate(retrieve_queries):
+            docs = first_docs if i == 0 else ["zz_9999"]
+            steps.append(TraceStep(index=i, tool_calls=[ToolCall(id=f"c{i}", name="retrieve", args={"query": q})],
+                                   results=[ToolResult(call_id=f"c{i}", name="retrieve", ok=True,
+                                                       retrieved=[RetrievedChunk(doc_id=d, source="s", score=0.5, text="") for d in docs])]))
+        steps.append(TraceStep(index=len(steps), thought="答"))
+        return AgentTrace(question="q", answer="对", steps=steps)
+
+    samples = [_sample("q1", keys=["对"]), _sample("q2", keys=["对"])]
+    samples[0] = GoldenSample(**{**samples[0].model_dump(), "expected_doc_ids": [["b"]]})
+    snap_traces = {"q1": trace(["a", "b"], ["x", "y"]), "q2": trace(["a"], ["x", "y"])}
+    snap_report = {"per_question": [{"id": "q1", "success": True}, {"id": "q2", "success": True}]}
+    rows = []
+    for p in range(2):
+        r1 = _row("q1", p, answer="错", tools=("retrieve",), k=2); r1.retrieved_doc_ids = ["x", "y"]
+        r2 = _row("q2", p, answer="对", tools=("retrieve",), k=2); r2.retrieved_doc_ids = ["x", "y"]
+        rows += [r1, r2]
+    sec = analyze.retrieval_persistence_section(rows, samples, snap_traces, snap_report, top_k=2)
+    assert sec["snapshot_median"] == pytest.approx(1.5) and sec["current_median_runs"] == pytest.approx(1.0)
+    assert sec["per_question"]["q1"]["snapshot_retrieves"] == 2 and sec["per_question"]["q1"]["current_retrieves"] == [1, 1]
+    assert sec["per_question"]["q1"]["first_retrieval_identical"] is True
+    assert sec["same_first_retrieval_different_verdict"] == ["q1"]
+    assert sec["failed_after_first_miss_without_retry"] == ["q1"]
+    assert "retrieve 调用次数中位数由 1.5 降至 1.0" in sec["conclusion"]
+    assert "变笨" not in sec["conclusion"]

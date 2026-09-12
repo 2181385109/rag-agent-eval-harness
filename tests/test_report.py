@@ -625,3 +625,97 @@ def test_snapshot_filename_matches_what_write_report_uses(tmp_path):
     rep = report_mod.build_report([make_sample(id="q1")], {})
     paths = report_mod.write_report(rep, directory=tmp_path)
     assert paths["snapshot"].name == report_mod.snapshot_filename(rep["meta"]["timestamp_utc"])
+
+
+# ------------------------------------------------------------------ 溯源路径不带本机绝对路径
+def test_repo_relative_strips_project_root_and_uses_posix(monkeypatch, tmp_path):
+    """快照里的溯源路径（backfill.source / reused_from）记成仓库相对路径。
+
+    2026-09-06 脱敏（c95c4b5）时把已有快照里的绝对路径手改成了相对路径，但写它的代码
+    没改，09-12 的两次重跑又把本机绝对路径带了回来。改产物不改脚本，下次还会再来一遍。
+    仓库外的路径原样保留——不猜一个不存在的相对位置。
+    """
+    monkeypatch.setattr(report_mod.config, "PROJECT_ROOT", tmp_path)
+    inside = tmp_path / "reports" / "judge_scores_x.jsonl"
+    assert report_mod.repo_relative(inside) == "reports/judge_scores_x.jsonl"
+    assert report_mod.repo_relative(str(inside)) == "reports/judge_scores_x.jsonl"
+    outside = tmp_path.parent / "elsewhere.jsonl"
+    assert report_mod.repo_relative(outside) == str(outside)
+
+
+def test_judge_backfill_source_is_repo_relative(monkeypatch, tmp_path):
+    monkeypatch.setattr(report_mod.config, "PROJECT_ROOT", tmp_path)
+    scores_path = tmp_path / "reports" / "judge_scores_x.jsonl"
+    scores_path.parent.mkdir(parents=True)
+    trace = make_trace(answer="答案")
+    from src.eval import judge
+
+    scores_path.write_text(
+        json.dumps({"id": "q1", "judge_score": 2, "answer_sha1": judge.answer_fingerprint("答案")}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    _, prov = report_mod.load_judge_backfill({"q1": trace}, scores_path)
+    assert prov["source"] == "reports/judge_scores_x.jsonl"
+    assert ":" not in prov["source"] and "\\" not in prov["source"]
+
+
+def test_reuse_marker_is_repo_relative_inside_the_repo(monkeypatch, tmp_path):
+    monkeypatch.setattr(report_mod.config, "PROJECT_ROOT", tmp_path)
+    prior = tmp_path / "reports" / "eval_20260905T142507Z.json"
+    prior.parent.mkdir(parents=True)
+    prior.write_text(
+        json.dumps({"meta": {"timestamp_utc": "2026-09-05T14:25:07+00:00"}, "metrics": {"ragas": {"scores": {"faithfulness": 0.9}}}}),
+        encoding="utf-8",
+    )
+    block = report_mod.load_ragas_reuse(prior)
+    assert block["reused_from"] == "reports/eval_20260905T142507Z.json"
+
+
+# ------------------------------------------------------------------ 报告里请求名与响应名并列
+def _served(agent=74, judge=11, ragas=426):
+    def chain(req, n):
+        return {"requested_model": req, "n_calls": n,
+                "response_model_counts": {"deepseek-flash": n}, "system_fingerprint_counts": {"fp": n}}
+    return {"agent": chain("deepseek-chat", agent), "judge": chain("deepseek-reasoner", judge),
+            "ragas": {"status": "recorded", **chain("deepseek-reasoner", ragas)}}
+
+
+def _report_with_all_chains(served):
+    sample = make_sample(id="q1", answer_type="open", answer_keys=[])
+    traces = {"q1": make_trace(answer="答案", tools=["retrieve"], retrieved=[["d1"]])}
+    rep = report_mod.build_report(
+        [sample], traces, judge_scores={"q1": 2},
+        judge_backfill={"source": "reports/judge_scores_x.jsonl", "judge_model": "deepseek-reasoner",
+                        "rubric_version": "v2", "open_threshold": 2, "n_rows": 1,
+                        "verified": ["q1"], "unverified": [], "stale": []},
+        ragas={"judge_model": "deepseek-reasoner", "embedding_model": "bge", "metrics": ["faithfulness"],
+               "scores": {"faithfulness": 0.9}, "scored_counts": {"faithfulness": 1}, "has_incomplete_metric": False,
+               "n_submitted": 1, "n_excluded": 0, "total": 1, "evaluated_ids": ["q1"], "excluded": []},
+    )
+    if served is not None:
+        rep["meta"]["served"] = served
+    return rep
+
+
+def test_markdown_prints_request_and_response_model_side_by_side_for_all_three_chains():
+    """请求名与响应名可能不同（旧名被路由到别的后端）；只打印请求名会让读报告的人以为被测就是它。"""
+    md = report_mod.render_markdown(_report_with_all_chains(_served()))
+    assert "被测模型：请求 `deepseek-chat`，响应 `deepseek-flash`×74" in md
+    assert "裁判（请求 `deepseek-reasoner`，响应 `deepseek-flash`×11）" in md
+    assert "裁判模型：请求 `deepseek-reasoner`，响应 `deepseek-flash`×426" in md
+
+
+def test_markdown_says_unrecorded_when_response_model_is_missing():
+    """09-06 之前的快照没有 meta.served：写「未记录」，不回填请求名。"""
+    md = report_mod.render_markdown(_report_with_all_chains(None))
+    assert "被测模型：请求 `deepseek-chat`，响应 未记录" in md
+    assert "裁判（请求 `deepseek-reasoner`，响应 未记录）" in md
+    assert "裁判模型：请求 `deepseek-reasoner`，响应 未记录" in md
+    assert "deepseek-flash" not in md
+
+
+def test_markdown_flags_absent_agreement_section_instead_of_silently_dropping_it():
+    """人工标注对应的是某一批答案；换了答案，一致率一节就没了。没了要说出来，不能悄悄消失。"""
+    md = report_mod.render_markdown(_report_with_all_chains(_served()))
+    assert "## 自动↔人工一致率" in md
+    assert "本快照不含此节" in md
